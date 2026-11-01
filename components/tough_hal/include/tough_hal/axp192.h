@@ -34,7 +34,7 @@ esp_err_t reset_lcd_and_touch();
 void set_backlight(uint8_t pct);
 
 /// Enable or disable the speaker amplifier.
-void set_speaker(bool on);
+esp_err_t set_speaker(bool on);
 
 }  // namespace axp192
 }  // namespace tough_hal

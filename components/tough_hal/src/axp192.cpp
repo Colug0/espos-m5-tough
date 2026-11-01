@@ -75,7 +75,7 @@ esp_err_t init() {
   if ((err = update(kRegPowerCtrl, static_cast<uint8_t>(~kEnDcdc3), 0x00)) != ESP_OK) {
     return err;
   }
-  set_speaker(false);
+  if ((err = set_speaker(false)) != ESP_OK) return err;
   ESP_LOGI(TAG, "LCD power on");
   return ESP_OK;
 }
@@ -105,10 +105,10 @@ void set_backlight(uint8_t pct) {
   update(kRegPowerCtrl, 0xFF, kEnLdo3);
 }
 
-void set_speaker(bool on) {
+esp_err_t set_speaker(bool on) {
   // 0x06 leaves GPIO2 floating, pulled up on the board: amplifier on.
   // 0x05 drives it low: amplifier off.
-  write(kRegGpio2Ctrl, on ? 0x06 : 0x05);
+  return write(kRegGpio2Ctrl, on ? 0x06 : 0x05);
 }
 
 }  // namespace axp192

@@ -3,7 +3,8 @@
  * From espos-p4-cockpit (components/cockpit_hal/src/ui.cpp). Tough changes:
  * draw buffers come from the display driver (internal DMA RAM, as the ESP32's
  * SPI DMA cannot read PSRAM), pixels are byte-swapped for the SPI panel, no
- * 180 degree rotation, and the tick comes from esp_timer_get_time().
+ * 180 degree rotation, the tick comes from esp_timer_get_time(), and a timer
+ * callback runs from a copy so it may cancel its own timer.
  */
 #include "tough_hal/ui.h"
 
@@ -137,7 +138,10 @@ void timer_cb(lv_timer_t* t) {
   auto* ctx = static_cast<TimerCtx*>(lv_timer_get_user_data(t));
   const uint32_t handle = ctx->handle;
   const bool once = ctx->once;
-  ctx->fn();
+  // Run a copy: a callback that cancels its own timer deletes ctx, and with
+  // it the std::function that would still be executing.
+  std::function<void()> fn = ctx->fn;
+  fn();
   // fn may have called cancel(handle) — then ctx is gone; check the map.
   auto it = s_timers.find(handle);
   if (it == s_timers.end()) return;
