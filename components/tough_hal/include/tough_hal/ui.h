@@ -1,6 +1,9 @@
-/* SPDX-License-Identifier: LicenseRef-Source-Available-No-Redistribution
- *
- * From espos-p4-cockpit (components/cockpit_hal), namespace renamed.
+/* SPDX-FileCopyrightText: 2026 Dirk Wahrheit */
+/* SPDX-FileCopyrightText: 2026 Thomas Christoffel */
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * From espos-p4-cockpit (components/cockpit_hal), namespace renamed, and
+ * stack_high_water() added.
  *
  * The UI thread: one FreeRTOS task owns LVGL (lv_timer_handler + all
  * lv_* calls). Everything that arrives from other tasks — SignalK stream

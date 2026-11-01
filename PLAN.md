@@ -17,9 +17,9 @@ flashen.
 |---|---|
 | Basis | espOS als Submodule am neuesten Release-Tag (zurzeit v0.26.0), ESP-IDF v6.0.3 |
 | UI | JLP-Gerät (JSON Layout Player) nach `JLP-PROTOCOL.md` des P4-Cockpits, LVGL 9 |
-| Code aus dem Cockpit | erlaubt (Absprache mit Dirk Wahrheit); Dirk stellt später auf Apache-2.0 um |
-| Lizenz dieses Repos | Apache-2.0, sobald die übernommenen Cockpit-Dateien es auch sind (siehe Risiken) |
-| Repo | `espos-m5-tough` im eigenen GitHub-Account; privat, bis Dirk die Cockpit-Lizenz umgestellt hat (geplant 2026-11-02) |
+| Code aus dem Cockpit | erlaubt; das Cockpit steht seit 2026-11-01 unter Apache-2.0 (`c3eaeed`, PR #198) |
+| Lizenz dieses Repos | Apache-2.0, auch für die übernommenen Cockpit-Dateien |
+| Repo | `espos-m5-tough` im eigenen GitHub-Account (`Colug0`); war bis zum Lizenzwechsel privat |
 | Firmware-Name | CMake `project(m5_tough)`. Er wird nie mehr geändert, weil OTA ihn prüft |
 | Einbau | unter Deck, Versorgung über 12 V an der Klemme, RS485 vorerst ungenutzt |
 | Helligkeit | manuell (Regler `@brightness`) und automatisch (Nachtdimmung über `environment.mode`, Dimmen bei Inaktivität) |
@@ -153,7 +153,8 @@ Ton-Regeln pro Pfad sind zurückgestellt.
 - [ ] Mit Dirk klären: Lizenzwechsel der Cockpit-Dateien vor der
       Veröffentlichung, oder eine schriftliche Erlaubnis bis dahin
 - [ ] GitHub-Repo `espos-m5-tough` im eigenen Account anlegen, privat
-- [ ] Nach Dirks Lizenzwechsel: Repo öffentlich, SPDX-Köpfe der übernommenen Dateien auf Apache-2.0
+- [x] Nach Dirks Lizenzwechsel: SPDX-Köpfe der übernommenen Dateien auf Apache-2.0
+- [ ] Repo öffentlich stellen (nach Freigabe durch den Eigner)
 - [x] Lokales Git-Repo (`main`), `LICENSE` (Apache-2.0), `README.md`
 - [x] `AGENTS.md` + `CLAUDE.md` (`@AGENTS.md`), `.gitattributes` (`eol=lf`),
       `.gitignore` (`*.pem`, `sdkconfig.local`, `build*/`, `managed_components/`)
@@ -254,10 +255,6 @@ Squash-Merge, keine Versionssprünge, keine KI-Attribution.
 
 ## Risiken und offene Punkte
 
-* **Lizenz in der Übergangszeit.** Übernommene Dateien tragen noch
-  `LicenseRef-Source-Available-No-Redistribution`. In einem öffentlichen Repo
-  sähen andere Nutzer diese Lizenz. Deshalb: Repo privat lassen, bis Dirk
-  umgestellt hat, oder vorher umstellen lassen.
 * **RAM** auf dem klassischen ESP32 (siehe oben). Abhilfe: früh messen.
 * **Pins:** Display, Backlight und Audio sind über bbn geklärt; RS485-Richtung
   und Lautsprecher-Enable-Bit vor der Nutzung im Schaltplan prüfen.
