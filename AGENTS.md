@@ -70,6 +70,12 @@ scripts/build.sh -B build -DIDF_TARGET=esp32 build
 scripts/build.sh -B build -p /dev/ttyACM0 flash monitor
 ```
 
+ESP-IDF refuses a project path that contains spaces, and building on
+`/mnt/c` from WSL is slow. When the checkout lives on the Windows drive
+(`C:\Users\...\espos M5 Tough`), mirror it into the WSL filesystem with
+`rsync -a --delete` (excluding `build*/`, `managed_components/`, `sdkconfig*`,
+`dependencies.lock` and `secure_boot_signing_key.pem`) and build there.
+
 The wrapper lives in espOS: one build lock per machine, half the cores,
 `nice`/`ionice`. Zero warnings is the gate; CI fails on compiler, linker and
 CMake warnings. sdkconfig: espOS's defaults first, this repo's
@@ -117,6 +123,9 @@ header, the repository stays private.
 * Before opening a PR, review the committed diff yourself, then run
   CodeRabbit: `cr review --agent --committed --base-commit "$(git merge-base origin/main HEAD)"`
   and keep the output (`coderabbit-cli` skill).
+* CodeRabbit does not review on its own while the repo is private (summaries
+  only) or has fewer than 10 stars. Comment `@coderabbitai review` on the PR
+  to start one.
 
 ## Pull requests to other repos
 

@@ -1,0 +1,4 @@
+## Everything espOS-related comes from the espos/ submodule, which pins its own
+## registry dependencies; LVGL is the HAL's (components/tough_hal).
+dependencies:
+  idf: ">=6.0.0"
