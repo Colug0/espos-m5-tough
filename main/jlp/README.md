@@ -29,6 +29,7 @@ so in its header. What changed for the M5Stack Tough:
 | Tab strip and pages in a flex column, so the strip never covers a page | `layout/layout_manager.cpp` |
 | HTTP handlers: the semaphore a handler waits on is shared with the UI-task lambda, so a timeout leaves no dangling handle; a stalled request body gives 408 after two receive timeouts; a timed-out screenshot keeps the single-flight flag until its snapshot has run | `net/http_api.cpp` |
 | Non-finite numbers from Signal K are dropped; a REST seed no longer overwrites a newer stream value; the int seed is clamped before the cast | `subject_registry.*`, `net/zone_fetch.cpp` |
+| `zones: []` removes a path's zones instead of keeping the old ones | `zone_registry.cpp` |
 | The ACK echo guard expires after 10 s, so an ACK that was never sent cannot hide the real clear | `notifications_registry.*` |
 | `SunState` keeps its state in a `std::atomic` (stream task writes, UI task reads) | `sun_state.*` |
 | Comments that described the P4 or the cockpit's history rewritten for this board | `layout/store.*`, `net/http_api.cpp`, `net/zone_fetch.cpp`, `zone_registry.cpp` |

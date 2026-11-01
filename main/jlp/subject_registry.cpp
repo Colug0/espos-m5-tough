@@ -34,21 +34,30 @@ void on_update(const espos_sk_update_t* u, void* arg) {
     std::string v(u->value_json);
     tough_hal::ui::post([entry, v = std::move(v)]() {
       lv_subject_t* s = entry->subject;
-      if (v != "null") entry->has_stream_value = true;
+      // has_stream_value is set only for a value actually applied, so a
+      // dropped update does not make zone_fetch skip a usable seed.
+      const bool is_null = v == "null";
       switch (entry->kind) {
         case SubjectKind::Float:
-          if (v != "null") {
+          if (!is_null) {
             // strtof takes "inf", "nan" and 1e999 (+Inf); no observer
             // (bar, arc, zone match, label) is ready for a non-finite value.
             const float f = strtof(v.c_str(), nullptr);
-            if (std::isfinite(f)) lv_subject_set_float(s, f);
+            if (std::isfinite(f)) {
+              lv_subject_set_float(s, f);
+              entry->has_stream_value = true;
+            }
           }
           break;
         case SubjectKind::Int:
-          if (v != "null") lv_subject_set_int(s, (int)strtol(v.c_str(), nullptr, 10));
+          if (!is_null) {
+            lv_subject_set_int(s, (int)strtol(v.c_str(), nullptr, 10));
+            entry->has_stream_value = true;
+          }
           break;
         case SubjectKind::Bool:
           lv_subject_set_int(s, (v == "true" || v == "1") ? 1 : 0);
+          if (!is_null) entry->has_stream_value = true;
           break;
         case SubjectKind::String: {
           // strip the JSON quotes; non-string values (numbers, null) are
@@ -69,6 +78,7 @@ void on_update(const espos_sk_update_t* u, void* arg) {
             txt = out;
           }
           lv_subject_copy_string(s, txt.c_str());
+          if (!is_null) entry->has_stream_value = true;
           break;
         }
       }
