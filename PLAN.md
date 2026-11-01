@@ -116,9 +116,29 @@ Gemessen am 2026-11-01, Firmware 0.1.0 (Phase 1), espOS 0.26.0, ein Tough
 
 Der Tiefstwert mit Signal K entsteht beim Verbindungsaufbau: die TLS-Handshakes
 kosten kurzzeitig rund 9 KB mehr. Vom PSRAM sind 4 MB eingeblendet (Grenze des
-klassischen ESP32), davon 3,87 MB frei; LVGL belegt seinen 256-KB-Pool. Noch
-nicht gemessen: ein großes JLP-Layout mit vielen Pfaden. Der espOS-Alarm liegt
-bei 12 KB frei bzw. 8 KB größter Block.
+klassischen ESP32), davon 3,87 MB frei; LVGL belegt seinen 256-KB-Pool. Der
+espOS-Alarm liegt bei 12 KB frei bzw. 8 KB größter Block.
+
+**Phase 2 (JLP-Player, 2026-11-01).** Mit Player, Signal K und dem Mirror-Modus
+des Designers fiel der interne RAM zunächst kurzzeitig auf 0,7–3,7 KB frei
+(`lowMemory`-Alarm). Gefunden mit einer Wächter-Task, die alle 25 ms misst; die
+Einbrüche dauerten unter 100 ms und fielen zwischen alle seltener gemessenen
+Punkte. Ursachen und Abhilfen:
+
+| Ursache | Abhilfe | Wirkung |
+|---|---|---|
+| TLS-Handshakes parallel zum Stream brauchen je 24 KB am Stück | `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` (TLS-Puffer im PSRAM) | kein `tlsMemory` mehr |
+| Zeichenpuffer 2 × 20 Zeilen | 2 × 10 Zeilen | +12,8 KB |
+| 10 statische WLAN-RX-Puffer | 6 (= Block-Ack-Fenster) | +6,4 KB |
+| UI-Task-Stack 16 KB, gemessen 6,3 KB genutzt | 12 KB | +4 KB |
+| Netzwerk-Spitzen: eingehende Pakete mehrerer Verbindungen gleichzeitig | 16 statt 32 dynamische RX-Puffer, TCP-Fenster 2880 statt 5760 | Tiefstwert beim Verbindungsaufbau 37,9 statt 3,7 KB |
+| JPEG-Encoder nimmt seine Arbeitspuffer (>35 KB) bevorzugt intern | `--wrap` der beiden `_inner`-Allokatoren auf PSRAM zuerst (`main/jpeg_psram.c`) | Mirror-Modus ohne Einbruch, Kodieren 146–217 statt 115 ms |
+| (verworfen) WiFi/lwIP-Puffer im PSRAM | `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=n` bleibt | schlechter: 30 KB frei, Tiefstwert 0,7 KB |
+
+Ergebnis mit Signal K, Designer-Layout (zwei Screens, Anker-Widgets) und
+Mirror-Modus über Minuten: **55,5 KB frei, größter Block 32,8 KB, Tiefstwert
+seit Boot 32,5 KB**, keine Speicherwarnung. Stacks gemessen: Zonenabruf 6 KB,
+Layoutabruf 5 KB von je 8 KB (mit TLS-Handshake).
 
 ## Use Cases und Widgets
 
@@ -150,9 +170,8 @@ Ton-Regeln pro Pfad sind zurückgestellt.
 
 ### Phase 0: Fundament
 
-- [ ] Mit Dirk klären: Lizenzwechsel der Cockpit-Dateien vor der
-      Veröffentlichung, oder eine schriftliche Erlaubnis bis dahin
-- [ ] GitHub-Repo `espos-m5-tough` im eigenen Account anlegen, privat
+- [x] Lizenz der Cockpit-Dateien geklärt (Apache-2.0 seit 2026-11-01)
+- [x] GitHub-Repo `espos-m5-tough` im eigenen Account anlegen, privat
 - [x] Nach Dirks Lizenzwechsel: SPDX-Köpfe der übernommenen Dateien auf Apache-2.0
 - [x] Repo öffentlich stellen (vom Eigner freigegeben, 2026-11-01)
 - [x] Lokales Git-Repo (`main`), `LICENSE` (Apache-2.0), `README.md`
@@ -205,11 +224,27 @@ und ein Testton laufen, und die Speichertabelle hier steht.
 
 ### Phase 2: JLP-Kern
 
-- [ ] `jlp/` aus dem Cockpit übernehmen, ohne Voice, Mikrofon, Stream und N2K
-- [ ] `/hello` (320×240, Widget-Liste, Firmware `m5-tough-x.y.z`), `/layout`,
-      `/healthz`, mDNS `_signalk-player._tcp`
-- [ ] Layout in LittleFS, Default-Layout für 320×240
-- [ ] Widgets `label`, `value`, `bar`, `arc`, `toggle`, `button`, `slider`
+- [x] `main/jlp/` aus dem Cockpit (`c3eaeed`) übernommen; Voice und Stream hinter
+      `JLP_VOICE`/`JLP_STREAM` (beide 0), N2K nicht übernommen (`main/jlp/README.md`)
+- [x] `/hello` (320×240, Widget-Liste, Firmware `m5-tough-jlp-<version>`), `/layout`,
+      `/screen`, `/healthz`, `/screenshot` (JPEG und BMP), `/beep`,
+      mDNS `_signalk-player._tcp` auf Port 8081
+- [x] Layout im eigenen NVS-Bereich `layout` (eigene Partitionstabelle
+      `partitions-16mb.csv` = espOS-16mb.csv + 128 KB), Default-Layout für 320×240
+- [x] Alle Widgets des Cockpits außer Voice und Stream: `label`, `value`, `toggle`,
+      `arc`, `bar`, `bargroup`, `button`, `notifications`, `anchor`, `anchor_track`,
+      `slider` (auch `@brightness`), dazu Alarm-Overlay, Chime, Idle-Dimmer
+- [x] Status- und Alarm-Overlay für 320×240 angepasst
+- [x] Build ohne Warnungen, Image 1,9 MB (28 % des App-Slots)
+- [x] Per USB geflasht (neue Partitionstabelle), Speicher gemessen und
+      entschärft (Tabelle oben)
+- [x] Designer auf dem Halpi2 verbindet sich, Layout gepusht (zwei Screens,
+      Anker-Widgets), Layout übersteht Neustarts, Mirror-Modus läuft
+- [x] Verbindungsabbrüche nach Neustart gefunden: der MikroTik behält die alte
+      WLAN-Sitzung („reconnecting“). Abhilfe: die Tough meldet sich nach der
+      ersten Verbindung jedes Starts einmal ab und wieder an
+- [ ] Issue für espOS: Neuanmeldung nach Neustart an MikroTik-Routern (Entwurf
+      zuerst für den Eigner)
 
 **Fertig, wenn:** Der Designer findet das Gerät, und ein geschobenes Layout zeigt
 Live-Daten vom Halpi2.

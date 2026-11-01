@@ -1,0 +1,17 @@
+# espos-m5-tough, 16 MB flash: espOS's 16mb.csv (espos/components/espos_core/
+# partitions/16mb.csv), every partition at the same offset, plus the player's
+# own NVS partition "layout" in the free space after storage. The layout store
+# (main/jlp/layout/store.cpp) keeps the pushed layout there, away from the
+# system nvs with the WiFi credentials, so a 64 KB layout can never crowd
+# them out. A device keeps the table it was first flashed with; a change here
+# reaches only boards flashed over USB.
+# Name,     Type, SubType,  Offset,  Size,   Flags
+nvs,        data, nvs,      ,        128K,
+otadata,    data, ota,      ,        8K,
+phy_init,   data, phy,      ,        4K,
+nvs_keys,   data, nvs_keys, ,        4K,    encrypted
+coredump,   data, coredump, ,        64K,
+ota_0,      app,  ota_0,    ,        6656K,
+ota_1,      app,  ota_1,    ,        6656K,
+storage,    data, littlefs, ,        1792K,
+layout,     data, nvs,      ,        128K,

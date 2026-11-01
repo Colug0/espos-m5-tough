@@ -55,6 +55,17 @@ Non-negotiable, as in the cockpit:
 * Display power, backlight (LDO3, brightness = voltage), LCD reset and speaker
   enable all go through the AXP192 on I2C 0x34. Initialise it before the panel
   and the touch controller.
+* Internal RAM dips last under 100 ms; the once-a-minute `heap running` line
+  misses them, `min` in it does not. When it falls, sample every 25 ms to find
+  the moment (PLAN.md has the table of causes found so far). Allocations that
+  ask for internal RAM explicitly ignore `SPIRAM_MALLOC_ALWAYSINTERNAL`; the
+  JPEG encoder did, and is redirected in `main/jpeg_psram.c`.
+* WiFi/lwIP buffers in PSRAM made internal RAM worse on this chip, not better;
+  capping the dynamic RX buffers and the TCP window is what helped.
+* The ESP32 restarts without deauthenticating. The boat's MikroTik then keeps
+  the old station state and delivers nothing to the device for minutes, so
+  `app_main.cpp` drops the first association of every boot. Check the router
+  log for "reconnecting" before blaming firmware for a lost Signal K link.
 * `espos_start_opts_t.board` is `"M5Stack Tough"` and the CMake project name is
   `m5_tough`. Never change either: OTA and the registry match on them.
 
@@ -75,6 +86,19 @@ ESP-IDF refuses a project path that contains spaces, and building on
 (`C:\Users\...\espos M5 Tough`), mirror it into the WSL filesystem with
 `rsync -a --delete` (excluding `build*/`, `managed_components/`, `sdkconfig*`,
 `dependencies.lock` and `secure_boot_signing_key.pem`) and build there.
+
+Flash from Windows, not through `usbipd` into WSL: the forwarded CH9102
+dropped the connection mid-write and then hung. The Tough is a native COM
+port on Windows, and esptool reads the build from the WSL filesystem:
+
+```powershell
+cd \\wsl$\Ubuntu\home\thomas\dev\espos-m5-tough\build
+py -m esptool --chip esp32 -p COM4 -b 460800 --before default-reset --after hard-reset write-flash "@flash_args"
+py -m serial.tools.miniterm COM4 115200
+```
+
+If a write stops with "Lost connection", unplug and replug the USB cable and
+start again; the ROM loader is always there.
 
 The wrapper lives in espOS: one build lock per machine, half the cores,
 `nice`/`ionice`. Zero warnings is the gate; CI fails on compiler, linker and

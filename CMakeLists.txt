@@ -10,12 +10,13 @@
 #   scripts/build.sh -B build -DIDF_TARGET=esp32 build
 cmake_minimum_required(VERSION 3.22)
 
-# The Tough carries 16 MB. A device keeps the table it was first flashed with
-# (OTA replaces app slots, never the table), so a change here reaches only
-# boards flashed over USB afterwards.
+# The Tough carries 16 MB. The table is espOS's 16mb.csv plus the layout
+# store's own NVS partition (partitions-16mb.csv). A device keeps the table it
+# was first flashed with (OTA replaces app slots, never the table), so a
+# change here reaches only boards flashed over USB afterwards.
 include("${CMAKE_CURRENT_LIST_DIR}/espos/cmake/espos_project.cmake")
 espos_project_prologue(NAME "m5-tough"
-                       PARTITIONS "${ESPOS_PARTITIONS_DIR}/16mb.csv")
+                       PARTITIONS "${CMAKE_CURRENT_LIST_DIR}/partitions-16mb.csv")
 
 # LVGL is configured by the HAL's lv_conf.h, not by Kconfig.
 idf_build_set_property(COMPILE_DEFINITIONS "-DLV_CONF_PATH=\"${CMAKE_CURRENT_LIST_DIR}/components/tough_hal/lv_conf.h\"" APPEND)
