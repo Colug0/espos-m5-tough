@@ -1,5 +1,7 @@
-/* SPDX-License-Identifier: LicenseRef-Source-Available-No-Redistribution
- *
+/* SPDX-FileCopyrightText: 2026 Dirk Wahrheit */
+/* SPDX-FileCopyrightText: 2026 Thomas Christoffel */
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
  * From espos-p4-cockpit (components/cockpit_hal/src/ui.cpp). Tough changes:
  * draw buffers come from the display driver (internal DMA RAM, as the ESP32's
  * SPI DMA cannot read PSRAM), pixels are byte-swapped for the SPI panel, no

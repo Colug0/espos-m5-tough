@@ -104,10 +104,11 @@ NVS (setup portal); bench overrides go in `sdkconfig.local`.
 
 ## Licensing
 
-This repo is Apache-2.0. Files taken over from espos-p4-cockpit keep their
-original SPDX header until the cockpit is relicensed to Apache-2.0; then their
-headers change in one commit. While any file carries the source-available
-header, the repository stays private.
+This repo is Apache-2.0, and so is espos-p4-cockpit since its relicensing
+(`c3eaeed`, PR #198). Code taken over from the cockpit keeps Dirk Wahrheit's
+`SPDX-FileCopyrightText` line, gains one for whoever changes it here, and says
+in its header comment what changed. Runtime and bundled dependencies stay
+permissive.
 
 ## Commits and pull requests
 
@@ -123,9 +124,10 @@ header, the repository stays private.
 * Before opening a PR, review the committed diff yourself, then run
   CodeRabbit: `cr review --agent --committed --base-commit "$(git merge-base origin/main HEAD)"`
   and keep the output (`coderabbit-cli` skill).
-* CodeRabbit does not review on its own while the repo is private (summaries
-  only) or has fewer than 10 stars. Comment `@coderabbitai review` on the PR
-  to start one.
+* Whether CodeRabbit reviews on its own depends on the plan and the repo's
+  visibility (docs.coderabbit.ai, "Plans"; in November 2026 the open-source
+  plan reviewed repos under 10 stars only on request). Comment
+  `@coderabbitai review` on the PR to start one.
 
 ## Pull requests to other repos
 

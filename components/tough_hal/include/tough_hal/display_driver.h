@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: LicenseRef-Source-Available-No-Redistribution
- *
+/* SPDX-FileCopyrightText: 2026 Dirk Wahrheit */
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
  * From espos-p4-cockpit (components/cockpit_hal), namespace renamed. Kept
  * identical in shape so the cockpit's JLP code runs on it unchanged.
  */

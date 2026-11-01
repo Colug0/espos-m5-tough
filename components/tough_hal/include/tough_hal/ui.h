@@ -1,6 +1,9 @@
-/* SPDX-License-Identifier: LicenseRef-Source-Available-No-Redistribution
- *
- * From espos-p4-cockpit (components/cockpit_hal), namespace renamed.
+/* SPDX-FileCopyrightText: 2026 Dirk Wahrheit */
+/* SPDX-FileCopyrightText: 2026 Thomas Christoffel */
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * From espos-p4-cockpit (components/cockpit_hal), namespace renamed, and
+ * stack_high_water() added.
  *
  * The UI thread: one FreeRTOS task owns LVGL (lv_timer_handler + all
  * lv_* calls). Everything that arrives from other tasks — SignalK stream
@@ -38,7 +41,9 @@ void unlock();
 
 DisplayDriver* display();
 
-/** Smallest free stack the UI task has had, in bytes (0 before start()). */
+/** Smallest free stack the UI task has had, in bytes (0 before start()). The
+ * 16 KB stack is internal RAM, the scarce pool on this chip; this measurement
+ * is what a smaller size must be based on (espos-memory-budget). */
 uint32_t stack_high_water();
 
 }  // namespace ui
