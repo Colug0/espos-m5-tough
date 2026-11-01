@@ -34,9 +34,11 @@ void on_update(const espos_sk_update_t* u, void* arg) {
     std::string v(u->value_json);
     tough_hal::ui::post([entry, v = std::move(v)]() {
       lv_subject_t* s = entry->subject;
-      // has_stream_value is set only for a value actually applied, so a
-      // dropped update does not make zone_fetch skip a usable seed.
+      // Any delta, null included, is newer than zone_fetch's REST seed and
+      // makes it skip this path. Only a dropped non-finite float does not:
+      // the seed may still be the better reading.
       const bool is_null = v == "null";
+      bool fresh = true;
       switch (entry->kind) {
         case SubjectKind::Float:
           if (!is_null) {
@@ -45,19 +47,16 @@ void on_update(const espos_sk_update_t* u, void* arg) {
             const float f = strtof(v.c_str(), nullptr);
             if (std::isfinite(f)) {
               lv_subject_set_float(s, f);
-              entry->has_stream_value = true;
+            } else {
+              fresh = false;
             }
           }
           break;
         case SubjectKind::Int:
-          if (!is_null) {
-            lv_subject_set_int(s, (int)strtol(v.c_str(), nullptr, 10));
-            entry->has_stream_value = true;
-          }
+          if (!is_null) lv_subject_set_int(s, (int)strtol(v.c_str(), nullptr, 10));
           break;
         case SubjectKind::Bool:
           lv_subject_set_int(s, (v == "true" || v == "1") ? 1 : 0);
-          if (!is_null) entry->has_stream_value = true;
           break;
         case SubjectKind::String: {
           // strip the JSON quotes; non-string values (numbers, null) are
@@ -78,10 +77,10 @@ void on_update(const espos_sk_update_t* u, void* arg) {
             txt = out;
           }
           lv_subject_copy_string(s, txt.c_str());
-          if (!is_null) entry->has_stream_value = true;
           break;
         }
       }
+      if (fresh) entry->has_stream_value = true;
     });
   } else if (u->meta_json) {
     // raw meta object {units, description, zones, ...}: ZoneRegistry parses it
