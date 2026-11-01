@@ -41,7 +41,9 @@ void unlock();
 
 DisplayDriver* display();
 
-/** Smallest free stack the UI task has had, in bytes (0 before start()). */
+/** Smallest free stack the UI task has had, in bytes (0 before start()). The
+ * 16 KB stack is internal RAM, the scarce pool on this chip; this measurement
+ * is what a smaller size must be based on (espos-memory-budget). */
 uint32_t stack_high_water();
 
 }  // namespace ui
