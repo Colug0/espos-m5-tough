@@ -35,6 +35,7 @@ class ToughAudio : public espos_audio::AudioDriver {
 
   i2s_chan_handle_t tx_ = nullptr;
   QueueHandle_t queue_ = nullptr;
+  size_t ring_frames_ = 0;  // frames the I2S DMA ring holds
   std::atomic<bool> ready_{false};
   std::atomic<uint8_t> volume_{80};
   std::atomic<bool> enabled_{true};

@@ -62,15 +62,19 @@ esp_err_t init() {
     ESP_LOGE(TAG, "chip id 0x%02x, not an AXP192", id);
     return ESP_ERR_NOT_FOUND;
   }
+  // A failed write here leaves the panel unpowered or held in reset; return
+  // it so the caller runs headless instead of drawing into a dark LCD.
   // GPIO4 as NMOS open-drain output (LCD reset).
-  update(kRegGpio34Ctrl, 0x72, 0x84);
+  if ((err = update(kRegGpio34Ctrl, 0x72, 0x84)) != ESP_OK) return err;
   // LDO2 = 3.3 V (1.8 V + 15 x 0.1 V), LDO3 nibble untouched, then enable.
-  update(kRegLdo23Volt, 0x0F, 0xF0);
-  update(kRegPowerCtrl, 0xFF, kEnLdo2);
+  if ((err = update(kRegLdo23Volt, 0x0F, 0xF0)) != ESP_OK) return err;
+  if ((err = update(kRegPowerCtrl, 0xFF, kEnLdo2)) != ESP_OK) return err;
   // GPIO1 as NMOS open-drain output (touch reset).
-  update(kRegGpio1Ctrl, 0xF8, 0x00);
+  if ((err = update(kRegGpio1Ctrl, 0xF8, 0x00)) != ESP_OK) return err;
   // DCDC3 drives the Core2's backlight; on the Tough it is unused.
-  update(kRegPowerCtrl, static_cast<uint8_t>(~kEnDcdc3), 0x00);
+  if ((err = update(kRegPowerCtrl, static_cast<uint8_t>(~kEnDcdc3), 0x00)) != ESP_OK) {
+    return err;
+  }
   set_speaker(false);
   ESP_LOGI(TAG, "LCD power on");
   return ESP_OK;

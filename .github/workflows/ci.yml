@@ -70,8 +70,10 @@ jobs:
 
       # Zero warnings is the gate (AGENTS.md), and idf.py build succeeds with
       # compiler, linker and CMake warnings alike. CMake wraps its text over
-      # several lines, so each CMake warning is read with the lines that follow
-      # it. Three are expected:
+      # several lines, so each CMake warning is read with up to three lines
+      # that follow it; another warning in those lines ends the block and is
+      # judged on its own, so an allowed warning cannot hide one that stdout
+      # and stderr interleaved next to it. Three are expected:
       # - the development signing key CI builds with;
       # - the component manager's "re-run" pair on every configure. LVGL's
       #   registry manifest makes optional dependencies conditional on Kconfig
@@ -82,20 +84,17 @@ jobs:
         run: |
           set -euo pipefail
           found=$(sed 's/\x1b\[[0-9;]*[mK]//g' build.log | awk '
-            pending {
-              text = text " " $0
-              if (++n == 3) {
-                gsub(/[ \t]+/, " ", text)
-                if (text !~ /generating a development RSA-3072 signing key/ &&
-                    text !~ /tools\/cmake\/build\.cmake:[0-9]+ \(message\): Call Stack/ &&
-                    text !~ /Missing kconfig option\. Re-run the build process/) print text
-                pending = 0
-              }
-              next
+            function flush() {
+              gsub(/[ \t]+/, " ", text)
+              if (text !~ /generating a development RSA-3072 signing key/ &&
+                  text !~ /tools\/cmake\/build\.cmake:[0-9]+ \(message\): Call Stack/ &&
+                  text !~ /Missing kconfig option\. Re-run the build process/) print text
+              pending = 0
             }
-            /CMake Warning/ { pending = 1; text = $0; n = 0; next }
-            /warning:/ { print }
-            END { if (pending) print text }
+            /CMake Warning/ { if (pending) flush(); pending = 1; text = $0; n = 0; next }
+            /warning:/ { if (pending) flush(); print; next }
+            pending { text = text " " $0; if (++n == 3) flush(); next }
+            END { if (pending) flush() }
           ')
           if [ -n "$found" ]; then
             printf '%s\n' "$found"

@@ -1,37 +1,35 @@
 # SPDX-FileCopyrightText: 2026 Dirk Wahrheit
 # SPDX-License-Identifier: Apache-2.0
 #
-# Follows espOS releases. When espOS cuts vX.Y.Z, this opens a PR that moves
-# the `espos` submodule to that tag, so the bridge picks up espOS fixes
-# without anyone having to notice a release. Same job as the cockpit's
-# track-espos.yml, minus the parts that do not apply here (see below).
+# From dirkwa/espos-bathy-bridge. Opens a PR that moves the `espos` submodule
+# to a new espOS release tag, so the firmware picks up espOS fixes without
+# anyone having to notice a release.
 #
-# It opens the PR and stops there. A submodule bump changes the binary that goes
-# on a boat, so a human merges it after the PR's CI is green (every target
-# builds there) and, where it matters, after flashing a build to a device.
-# Merging makes release-please propose the next bridge release as usual.
+# It stops at the PR. A submodule bump changes the firmware that runs on the
+# Tough, so a maintainer merges it after the PR's CI is green and, where it
+# matters, after flashing a build to a device. The commit is titled `fix:` so
+# that release-please, once this repository releases through it (PLAN.md,
+# phase 4), proposes a patch release after the merge.
 #
 # A submodule never moves on its own, and Dependabot's gitsubmodule ecosystem is
 # no substitute: it follows the tip of espOS main rather than release tags.
 #
-# What the cockpit's version does and this one does not:
+# Deliberately left out:
 #
-# - No dependencies.lock step. The lock is git-ignored here, so every build
+# - A dependencies.lock step. The lock is git-ignored here, so every build
 #   solves it afresh against the pinned espOS manifests; there is nothing to
 #   regenerate or commit.
-# - No firmware dispatch. release-firmware.yml's workflow_dispatch needs an
-#   existing release TAG and attaches assets to that release, so dispatching it
-#   on a tracking branch would build the wrong thing or publish to the wrong
-#   release. The PR's own CI answers "does it build"; signed images come from
-#   the release that follows the merge.
+# - A firmware build. The PR's own CI answers "does it build"; signed images
+#   come only from a release, never from a tracking branch.
 #
-# The PR is opened with a GitHub App's token (RELEASE_APP_PRIVATE_KEY, with the
-# App's Client ID inline), because GitHub holds the checks of a PR opened with
-# the workflow token until a maintainer approves them, while an App's PR runs
-# them at once. The App must be installed on this repository: the key alone
-# gets a 404. Without the secret, or without the installation, it falls back to
-# the workflow token, which also needs "Allow GitHub Actions to create and
-# approve pull requests" enabled in the repository's Actions settings.
+# This repository has no GitHub App of its own, so RELEASE_APP_PRIVATE_KEY is
+# unset and the PR is opened with the workflow token. GitHub then holds the
+# PR's checks until a maintainer approves them (or closes and reopens the PR).
+# The App step stays so that an App can be added later: create one with
+# contents and pull-requests write, install it on this repository, put its
+# Client ID below and its key in RELEASE_APP_PRIVATE_KEY. The workflow token
+# path needs "Allow GitHub Actions to create and approve pull requests" in the
+# repository's Actions settings.
 name: Track espOS releases
 
 # One run at a time: a scheduled and a manual run overlapping could both see no
@@ -55,7 +53,10 @@ permissions: {}
 
 jobs:
   track:
+    name: open the espOS bump PR
     runs-on: ubuntu-latest
+    # contents: push the tracking branch and delete superseded ones.
+    # pull-requests: open the bump PR and close the ones it supersedes.
     permissions:
       contents: write
       pull-requests: write
@@ -172,7 +173,9 @@ jobs:
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           # The Client ID is public (the App's settings page shows it), so it
-          # lives here; only the private key is a secret.
+          # lives here; only the private key is a secret. This one is the
+          # signalk-espOS org's release App, which is not installed on this
+          # repository; replace it when adding an App of this repository's own.
           client-id: Iv23liXbDO1OUUwlQoNc
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write

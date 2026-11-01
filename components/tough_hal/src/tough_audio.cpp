@@ -13,8 +13,10 @@ namespace tough_hal {
 namespace {
 const char* TAG = "audio";
 constexpr int kQueueLen = 4;
-// 20 ms of silence after the last clip, so the DMA ring has played the
-// clip's tail before the amplifier goes off.
+// i2s_channel_write() returns once samples are in the DMA ring, not once they
+// have played. Before the amplifier goes off, a whole ring of silence plus
+// 20 ms is written, so the clip's tail has left the ring. Written in chunks of
+// this size.
 constexpr size_t kTailFrames = 320;
 const int16_t kSilence[kTailFrames] = {};
 }  // namespace
@@ -22,6 +24,7 @@ const int16_t kSilence[kTailFrames] = {};
 void ToughAudio::init() {
   i2s_chan_config_t chan = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
   chan.auto_clear = true;  // an empty DMA ring sends zeros, not the last clip
+  ring_frames_ = static_cast<size_t>(chan.dma_desc_num) * chan.dma_frame_num;
   esp_err_t err = i2s_new_channel(&chan, &tx_, nullptr);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "i2s_new_channel: %s", esp_err_to_name(err));
@@ -92,8 +95,12 @@ void ToughAudio::run() {
     }
     free(clip.samples);
     if (uxQueueMessagesWaiting(queue_) == 0 && amp_on) {
-      i2s_channel_write(tx_, kSilence, sizeof(kSilence), &written,
-                        portMAX_DELAY);
+      for (size_t left = ring_frames_ + kTailFrames; left > 0;) {
+        const size_t n = left < kTailFrames ? left : kTailFrames;
+        i2s_channel_write(tx_, kSilence, n * sizeof(int16_t), &written,
+                          portMAX_DELAY);
+        left -= n;
+      }
       axp192::set_speaker(false);
       amp_on = false;
     }
