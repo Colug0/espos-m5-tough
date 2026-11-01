@@ -116,9 +116,12 @@ void start(DisplayDriver* display, TouchDriver* touch) {
   lv_indev_set_read_cb(in, indev_read_cb);
   lv_indev_set_user_data(in, touch);
 
-  // Big stack: widget_factory builds whole layouts on this thread; PSRAM
-  // stacks are not allowed on the classic ESP32, so internal RAM.
-  xTaskCreatePinnedToCore(ui_task, "ui", 16384, nullptr, 5, &s_task, 1);
+  // widget_factory builds whole layouts on this thread; PSRAM stacks are not
+  // allowed on the classic ESP32, so internal RAM, the scarce pool. 12 KB:
+  // measured high-water 6.3 KB used with a two-screen anchor layout and the
+  // designer's mirror running (2026-11-01). Re-measure after larger layouts
+  // (stack_high_water(), logged once a minute) before going lower.
+  xTaskCreatePinnedToCore(ui_task, "ui", 12288, nullptr, 5, &s_task, 1);
   xSemaphoreTake(s_started, portMAX_DELAY);
   ESP_LOGI(TAG, "ui task running (%dx%d)", display->width(), display->height());
 }

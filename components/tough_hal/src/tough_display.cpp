@@ -17,8 +17,11 @@ namespace {
 
 const char* TAG = "display";
 
-// 20 lines per strip: 12.8 KB each, two of them, all internal RAM.
-constexpr int kStripLines = 20;
+// 10 lines per strip: 6.4 KB each, two of them, all internal RAM. 20 lines
+// cost 12.8 KB more of the pool that ran out with the player, the Signal K
+// stream and the designer's mirror running; at 320 px a full redraw is 24
+// strips either way, so the panel is no slower to the eye.
+constexpr int kStripLines = 10;
 
 struct InitCmd {
   uint8_t cmd;

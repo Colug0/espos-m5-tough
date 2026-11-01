@@ -7,7 +7,9 @@
 # for whatever IDF_TARGET the shell happens to pass, or IDF's default.
 CONFIG_IDF_TARGET="esp32"
 
-# ---- Flash: 16 MB on the Tough (the prologue's 16mb.csv sets the table).
+# ---- Flash: 16 MB on the Tough. A project's own partition table sets no
+# flash size, so without this the 4 MB fallback would apply.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
@@ -24,9 +26,40 @@ CONFIG_SPIRAM_USE_MALLOC=y
 # to PSRAM; whatever needs internal or DMA memory asks for it explicitly.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
-# WiFi/lwIP buffers in PSRAM made the station unable to associate on another
-# chip (espos-memory-budget, trap 2). Off until measured on this one.
+# WiFi/lwIP buffers stay internal. Moved to PSRAM (measured 2026-11-01) the
+# station still joined, but internal RAM got worse, not better: 30 KB free
+# and a 17 KB largest block at rest instead of ~45/32, a 0.7 KB low-water and
+# a lowMemory alarm. The radio cannot DMA from PSRAM, so frames are copied
+# through internal buffers anyway.
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=n
+
+# ---- WiFi: 6 static RX buffers instead of 10. They must be internal RAM,
+# ~1.6 KB each, and 6 equals the block-ack window (CONFIG_ESP_WIFI_RX_BA_WIN),
+# so aggregation still fits. Frees 6.4 KB; a display moving a few KB/s does
+# not miss them (espos-memory-budget, measured on the ESP32-C5 BLE gateway).
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
+# Stated, because CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP raises IDF's default to
+# 16, and IDF refuses a window above twice the static buffers.
+CONFIG_ESP_WIFI_RX_BA_WIN=6
+
+# ---- Network bursts: cap how much internal RAM incoming data may hold.
+# With the Signal K stream, espOS's metadata GETs, the zone fetch and the
+# designer all receiving at once, queued frames took internal RAM from ~40 KB
+# to 3.7 KB free (2.4 KB largest block) for milliseconds (2026-11-01, 25 ms
+# watcher). At most 16 queued frames instead of 32 (the rest are dropped and
+# TCP resends them), and two segments in flight per connection instead of
+# four. The display moves a few KB/s; it does not need the throughput.
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
+CONFIG_LWIP_TCP_WND_DEFAULT=2880
+
+# ---- TLS: mbedTLS record buffers in PSRAM. With the player's zone and
+# layout fetches running beside the Signal K stream, a handshake needs 24 KB
+# of contiguous internal RAM per connection; measured on 2026-11-01 the
+# largest internal block fell to 17 KB and fetches were deferred (tlsMemory
+# warn). espos_sk's pre-flight measures PSRAM when this is set. The Tough's
+# PSRAM is a separate chip on the board, so its contents are readable with a
+# probe on the bus; the TLS session keys are what that exposes.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
 # ---- C++
 CONFIG_COMPILER_CXX_EXCEPTIONS=n

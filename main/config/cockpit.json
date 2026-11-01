@@ -1,0 +1,27 @@
+{
+  "namespace": "cockpit",
+  "version": 1,
+  "title": "Display",
+  "description": "Display behaviour that is not part of a layout: brightness and the layout push port. The namespace is \"cockpit\" because the espOS HMI Designer writes cockpit.brightness, as it does on espos-p4-cockpit.",
+  "keys": [
+    {
+      "name": "brightness",
+      "type": "int",
+      "default": 60,
+      "min": 5,
+      "max": 100,
+      "unit": "%",
+      "title": "Backlight brightness"
+    },
+    {
+      "name": "api_port",
+      "type": "int",
+      "default": 8081,
+      "min": 1,
+      "max": 65535,
+      "title": "Layout API port",
+      "restart_required": true,
+      "description": "TCP port of the JSON Layout Player API the designer talks to (/layout, /hello, /screenshot)."
+    }
+  ]
+}

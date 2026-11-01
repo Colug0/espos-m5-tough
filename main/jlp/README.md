@@ -1,0 +1,38 @@
+# JSON Layout Player
+
+The player that renders layouts pushed by the
+[espOS HMI Designer](https://github.com/signalk-espOS/signalk-espos-hmi-designer).
+The wire contract is
+[JLP-PROTOCOL.md](https://github.com/dirkwa/espos-p4-cockpit/blob/main/JLP-PROTOCOL.md)
+in espos-p4-cockpit.
+
+## Where it comes from
+
+Every file here comes from
+[espos-p4-cockpit](https://github.com/dirkwa/espos-p4-cockpit) `main/jlp/`
+at `c3eaeed` (Apache-2.0, Dirk Wahrheit), except `features.h`. Each file says
+so in its header. What changed for the M5Stack Tough:
+
+| Change | Files |
+|---|---|
+| `cockpit_hal` renamed to `tough_hal` (the UI task API is the same) | all that use the UI task |
+| Voice and stream behind `JLP_VOICE` / `JLP_STREAM` (`features.h`), both 0 here: no `voice`, `speaker`, `mic`, `volume`, `stream` widgets, no `/mic_probe*`, `/mic_gain`, `/stream_soak` | `widgets/widget_factory.cpp`, `net/http_api.*` |
+| Not taken over: `audio/voice_control.*`, `mic_overlay.*`, `net/stream_client.*`, `net/wake_discover.*` | |
+| `/hello` reports `firmware: m5-tough-jlp-<version>` and falls back to the hostname `m5-tough` | `net/http_api.cpp` |
+| Status strip: on a panel narrower than 480 px only host, WiFi and Signal K | `status_overlay.cpp` |
+| Alert overlay: on a panel lower than 400 px the whole screen, 10 px padding, 150x48 ACK button | `alert_overlay.cpp` |
+| Default layout for 320x240, read-only widgets only | `default_layout.h` |
+| `lv_display_get_default()` instead of `NULL`, which LVGL 9.6 deprecates | `idle_dimmer.cpp` |
+| Boot layout from `applicationData/global/m5-tough/1/layout.json` instead of `…/p4-cockpit/…` (JLP-PROTOCOL.md says `<hostname>`; both firmwares use a fixed application id) | `net/layout_fetch.cpp` |
+| The `screenshot[jpeg]` log line carries internal RAM free/largest (KB) at start, after the snapshot, after encoding and after sending | `net/http_api.cpp` |
+| The zone and layout fetch tasks log their stack high-water mark when they end | `net/zone_fetch.cpp`, `net/layout_fetch.cpp` |
+
+The guards instead of deletions keep the files close to the cockpit's, so a
+fix can travel in either direction and the player can become a shared
+component later.
+
+## Rules
+
+The architecture invariants in [AGENTS.md](../../AGENTS.md) apply here first:
+never blank the helm, LVGL only on the UI task, no optimistic switch latch,
+blocking Signal K REST calls on their own tasks, an additive wire format.
