@@ -102,6 +102,24 @@ ohne DMA schiebt. Mit `esp_lcd` und DMA brauchen wir interne Puffer (unten).
 * Ab dem ersten Build wird der freie interne RAM pro Startphase gemessen und
   hier eingetragen.
 
+Gemessen am 2026-11-01, Firmware 0.1.0 (Phase 1), espOS 0.26.0, ein Tough
+(Chip-Rev. v3.1, ILI9342C). Interner RAM = `MALLOC_CAP_INTERNAL | 8BIT`:
+
+| Phase | intern frei | größter Block | verbraucht |
+|---|---|---|---|
+| Start (`heap boot`) | 222,9 KB | 94,2 KB | – |
+| AXP192, Display, Touch, LVGL, UI-Task (`heap ui`) | 179,1 KB | 77,8 KB | 43,9 KB (Zeichenpuffer 25,6 KB, UI-Stack 16 KB) |
+| Lautsprecher (`heap audio`) | 172,6 KB | 77,8 KB | 6,4 KB |
+| espOS: httpd, WLAN mit Portal, Signal K, OTA, mDNS (`heap espos`) | 72,4 KB | 61,4 KB | 100,3 KB |
+| nach 60 s, Portal offen, ohne Signal K-Verbindung (`heap running`) | 71,5 KB | 61,4 KB | Tiefstwert 64,1 KB |
+| nach 60 s, im WLAN, Signal K-Stream über TLS zum Halpi2 (`heap running`) | 74,3 KB | 59,4 KB | Tiefstwert 55,0 KB |
+
+Der Tiefstwert mit Signal K entsteht beim Verbindungsaufbau: die TLS-Handshakes
+kosten kurzzeitig rund 9 KB mehr. Vom PSRAM sind 4 MB eingeblendet (Grenze des
+klassischen ESP32), davon 3,87 MB frei; LVGL belegt seinen 256-KB-Pool. Noch
+nicht gemessen: ein großes JLP-Layout mit vielen Pfaden. Der espOS-Alarm liegt
+bei 12 KB frei bzw. 8 KB größter Block.
+
 ## Use Cases und Widgets
 
 | Anzeige | Widget | Signal K-Pfade |
@@ -142,13 +160,16 @@ Ton-Regeln pro Pfad sind zurückgestellt.
 - [x] `.coderabbit.yaml` nach dem Cockpit, mit `ignore_title_keywords: "chore: release"`
 - [x] Aus `espos-bathy-bridge`: `pr-title.yml`, `label-by-title.yml`,
       `.github/release.yml`, Dependabot für Actions
-- [ ] Erster Commit und Push (nach Freigabe)
-- [ ] Repo-Einstellung „Allow GitHub Actions to create and approve pull requests“
-- [ ] CodeRabbit-App für das Repo freischalten
+- [x] Erster Commit, privates Repo `Colug0/espos-m5-tough` angelegt
+- [x] Push nach `origin/main`
+- [x] Repo-Einstellung „Allow GitHub Actions to create and approve pull requests“
+- [x] CodeRabbit-App für das Repo freigeschaltet (Login über GitHub)
 - [x] Signierschlüssel erzeugt: RSA-3072, in WSL unter
       `~/keys/espos-m5-tough/signing_key.pem` (0600), `signingKeyId` `7bcd3eec7a8b2f68`
 - [ ] Sicherung des Schlüssels an einem zweiten Ort (Passwortmanager oder USB-Stick)
-- [ ] Schlüssel als Secret `SIGNING_KEY_PEM` ablegen (nach dem Anlegen des Repos)
+- [x] Schlüssel als Secret `SIGNING_KEY_PEM` abgelegt (2459 Byte). Der erste
+      signierte Release-Build muss ihn bestätigen: `espsecure signature-info-v2`
+      auf dem Image muss `7bcd3eec7a8b2f68` zeigen
 - [ ] Branch-Schutz (Skill `oss-branch-protection`), sobald CI läuft
 - [x] WSL2: Systempakete, ESP-IDF v6.0.3 (`install.sh esp32`), `usbipd-win`
 - [x] Skills `espos-firmware` und `espos-dev` installiert
@@ -161,16 +182,22 @@ von Anfang an rot.
 
 ### Phase 1: Hardware-Bringup
 
-- [ ] espOS-Submodule, `.idf-version`, `version.txt`, `scripts/build.sh`
-- [ ] `ci.yml` (Ziel `esp32`, Warnungs-Gate) und `track-espos.yml` aus bathy-bridge
-- [ ] Prologue mit `16mb.csv`, Ziel `esp32`, PSRAM-Einstellungen
-- [ ] AXP192: LCD-Strom, Backlight, Reset, Lautsprecher-Enable
-- [ ] Display über `esp_lcd` (ILI9342C), Farbreihenfolge und Inversion prüfen
-- [ ] CHSC6540-Touchtreiber
-- [ ] LVGL 9 und UI-Task
-- [ ] NS4168 als `espos_audio::AudioDriver`, Testton (ist der 1-W-Lautsprecher
-      an Bord laut genug?)
-- [ ] Speichertabelle pro Startphase
+- [x] espOS-Submodule (v0.26.0), `.idf-version`, `version.txt`, `scripts/build.sh`
+- [x] `ci.yml` (Ziel `esp32`, Warnungs-Gate) und `track-espos.yml` aus bathy-bridge
+- [x] Prologue mit `16mb.csv`, Ziel `esp32`, PSRAM-Einstellungen
+- [x] AXP192: LCD-Strom (LDO2), Backlight (LDO3), Resets (GPIO4/GPIO1), Lautsprecher (GPIO2)
+- [x] Display über `esp_lcd` (ILI9342C, wahlweise ILI9342E per Kconfig)
+- [x] CHSC6540-Touchtreiber
+- [x] LVGL 9.6 und UI-Task, LVGL-Heap als 256-KB-Pool im PSRAM
+- [x] NS4168 als `espos_audio::AudioDriver`, Testton-Button
+- [x] Build ohne Warnungen, Image 1,6 MB (24 % des App-Slots)
+- [x] Auf dem Gerät geprüft: Bild, Farben, Helligkeit, Ton
+- [x] Touch-Koordinaten geprüft: Ecken 1,1 und 319,239, keine Kalibrierung nötig
+- [x] WLAN über das Setup-Portal, Signal K-Zugriff am Halpi2 freigegeben, Stream verbunden
+- [ ] Lautstärke an Bord bewerten (1-W-Lautsprecher)
+- [x] Speichertabelle pro Startphase eingetragen
+- [x] Speicher mit WLAN, Signal K-Stream und Freigabe gemessen (74 KB frei, Tiefstwert 55 KB)
+- [ ] ILI9342C/E auf dem Bus erkennen statt per Kconfig wählen
 
 **Fertig, wenn:** Setup-Portal, Signal K-Freigabe, eine LVGL-Testseite mit Touch
 und ein Testton laufen, und die Speichertabelle hier steht.

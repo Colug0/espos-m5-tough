@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Thomas Christoffel
+# SPDX-License-Identifier: Apache-2.0
+menu "M5Stack Tough hardware"
+
+choice TOUGH_PANEL
+    prompt "LCD controller"
+    default TOUGH_PANEL_ILI9342C
+    help
+      M5Stack has built the Core2 family with two display controllers that
+      need different init sequences: the ILI9342C and, in later batches, the
+      ILI9342E (see M5GFX, Panel_ILI9342E). Both are 320x240. Sending the C
+      sequence to an E is not guaranteed to work. Until the firmware tells
+      them apart on the bus, pick the one your board has; if the screen stays
+      dark or the colours are wrong with one, try the other.
+
+    config TOUGH_PANEL_ILI9342C
+        bool "ILI9342C"
+
+    config TOUGH_PANEL_ILI9342E
+        bool "ILI9342E"
+
+endchoice
+
+endmenu
