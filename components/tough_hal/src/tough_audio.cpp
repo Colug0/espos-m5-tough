@@ -81,12 +81,20 @@ void ToughAudio::task(void* arg) { static_cast<ToughAudio*>(arg)->run(); }
 
 void ToughAudio::run() {
   bool amp_on = false;
+  // amp_on tracks what the AXP192 confirmed. A failed switch-on is retried
+  // with the next clip; a failed switch-off once a second until it holds.
   for (;;) {
     Clip clip;
-    xQueueReceive(queue_, &clip, portMAX_DELAY);
+    if (xQueueReceive(queue_, &clip, amp_on ? pdMS_TO_TICKS(1000) : portMAX_DELAY) != pdTRUE) {
+      if (axp192::set_speaker(false) == ESP_OK) amp_on = false;
+      continue;
+    }
     if (!amp_on && enabled_) {
-      axp192::set_speaker(true);
-      amp_on = true;
+      if (axp192::set_speaker(true) == ESP_OK) {
+        amp_on = true;
+      } else {
+        ESP_LOGW(TAG, "could not switch the amplifier on");
+      }
     }
     size_t written = 0;
     if (enabled_) {
@@ -101,8 +109,11 @@ void ToughAudio::run() {
                           portMAX_DELAY);
         left -= n;
       }
-      axp192::set_speaker(false);
-      amp_on = false;
+      if (axp192::set_speaker(false) == ESP_OK) {
+        amp_on = false;
+      } else {
+        ESP_LOGW(TAG, "could not switch the amplifier off");
+      }
     }
   }
 }

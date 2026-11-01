@@ -4,12 +4,14 @@
  * draw buffers come from the display driver (internal DMA RAM, as the ESP32's
  * SPI DMA cannot read PSRAM), pixels are byte-swapped for the SPI panel, no
  * 180 degree rotation, the tick comes from esp_timer_get_time(), and a timer
- * callback runs from a copy so it may cancel its own timer.
+ * callback is held by a shared_ptr while it runs so it may cancel its own
+ * timer.
  */
 #include "tough_hal/ui.h"
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 
 #include "esp_log.h"
@@ -130,7 +132,10 @@ void post(std::function<void()> fn) {
 
 namespace {
 struct TimerCtx {
-  std::function<void()> fn;
+  // Shared so that timer_cb can hold the callable while it runs: a callback
+  // that cancels its own timer deletes ctx, but not the function executing.
+  // One callable for every firing, so a mutable lambda keeps its state.
+  std::shared_ptr<std::function<void()>> fn;
   uint32_t handle;
   bool once;
 };
@@ -138,10 +143,8 @@ void timer_cb(lv_timer_t* t) {
   auto* ctx = static_cast<TimerCtx*>(lv_timer_get_user_data(t));
   const uint32_t handle = ctx->handle;
   const bool once = ctx->once;
-  // Run a copy: a callback that cancels its own timer deletes ctx, and with
-  // it the std::function that would still be executing.
-  std::function<void()> fn = ctx->fn;
-  fn();
+  const auto fn = ctx->fn;
+  (*fn)();
   // fn may have called cancel(handle) — then ctx is gone; check the map.
   auto it = s_timers.find(handle);
   if (it == s_timers.end()) return;
@@ -152,7 +155,7 @@ void timer_cb(lv_timer_t* t) {
   }
 }
 uint32_t make_timer(uint32_t ms, std::function<void()> fn, bool once) {
-  auto* ctx = new TimerCtx{std::move(fn), 0, once};
+  auto* ctx = new TimerCtx{std::make_shared<std::function<void()>>(std::move(fn)), 0, once};
   uint32_t h = 0;
   auto create = [&] {
     // 0 is the callers' "no timer" sentinel, and after a counter wrap a
