@@ -25,6 +25,17 @@ jobs:
       matrix:
         target: [esp32]
     steps:
+      # The ESP-IDF image fills most of a hosted runner's disk, and unpacking
+      # LVGL from the component registry then failed with "No space left on
+      # device". Remove toolchains this job never uses before the pull.
+      - name: free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/share/swift
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
       # fetch-depth: 0 because the version baked into the image comes from
       # `git describe`; with the default depth of 1 there are no tags, and
       # every build between two releases would claim to BE the last release.
