@@ -1,0 +1,8 @@
+# LF everywhere: the firmware is built in WSL2/Linux and in CI, and shell
+# scripts with CRLF fail there ("bad interpreter"). Windows checkouts keep LF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.bin binary
+*.pdf binary

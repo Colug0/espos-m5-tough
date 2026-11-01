@@ -1,0 +1,111 @@
+language: en-US
+
+reviews:
+  profile: assertive
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    # release-please's PRs only bump the version and changelog of changes
+    # already reviewed; dependency bumps come from automation.
+    ignore_title_keywords:
+      - "chore: release"
+      - "[skip review]"
+      - "WIP"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "github-actions[bot]"
+
+  # Generated or vendored: never authored here.
+  path_filters:
+    - "!managed_components/**"
+    - "!build*/**"
+    - "!espos/**"
+    - "!dependencies.lock"
+    - "!**/*.a"
+    - "!**/*.bin"
+
+  high_level_summary_instructions: |
+    Write summaries in present tense. Describe what the code does, not what it
+    did. Skip filler like "This PR"; go straight to the change.
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        ## Scope
+
+        espos-m5-tough is ESP32 (classic, D0WDQ6-V3) firmware for the M5Stack
+        Tough on espOS: a JSON Layout Player (LVGL 9) that renders layouts
+        pushed by the espOS HMI Designer and binds widgets to Signal K paths.
+        There are no host tests; verification happens on the device, so weigh
+        claims of "tested" against whether the PR shows device output.
+
+        ## Architecture invariants (AGENTS.md, non-negotiable)
+
+        - Never blank the helm: a layout is built under a hidden staging
+          parent and swapped in only when complete. A failed push leaves the
+          previous layout rendering.
+        - LVGL is single-writer on the UI task. Flag any `lv_*` call reached
+          from the HTTP task, a Signal K callback, an event handler or a timer
+          that is not an LVGL timer.
+        - Blocking Signal K REST calls never run on the UI task, the stream
+          task, an event handler or a URI handler.
+        - The wire format is additive. Flag a removed or renamed field or a
+          changed meaning without a `schema` bump.
+        - No optimistic switch latch: toggle visuals follow the subscription.
+
+        ## Memory (classic ESP32)
+
+        SPI DMA cannot read PSRAM, so LVGL draw buffers must be internal and
+        DMA-capable. Task stacks must be internal on this chip. Flag a large
+        internal allocation, a new task, or a stack size change that comes
+        without a measured high-water mark or free-heap figure.
+
+        ## Cross-task state
+
+        Anything written on one task and read on another must be atomic or
+        guarded. Flag plain shared scalars.
+
+        ## Boat configuration must never be committed
+
+        No WiFi SSIDs or passwords, no server IPs or hostnames, no API keys or
+        tokens, no `*.pem`: not in source, `sdkconfig.defaults` or Kconfig
+        defaults. Flag any literal that looks like a credential or a LAN
+        address.
+
+        ## Comments
+
+        WHY, not WHAT. Flag comments that restate the code and development
+        narrative ("step 3", "added in PR #N"). Flag stale references to
+        symbols that no longer exist.
+
+        ## Commit / PR conventions
+
+        - Conventional commits: `<type>(<scope>): <subject>`, imperative,
+          lower case, subject <= 50 chars. Titles become release notes.
+        - No version bumps in feature or fix PRs; release-please owns them.
+        - One logical change per PR.
+
+        ## Unchecked items in test plans
+
+        If a PR description has a checklist with unchecked items, flag it.
+
+knowledge_base:
+  linked_repositories:
+    - repository: signalk-espOS/espOS
+      instructions: >-
+        The base this firmware builds on, pinned as the espos/ submodule at a
+        release tag: the CMake prologue, sdkconfig layers, partition tables,
+        the httpd, Signal K client, OTA and the /api/v1 routes. A submodule
+        bump must build against the new tag.
+    - repository: dirkwa/espos-p4-cockpit
+      instructions: >-
+        The reference JLP device. JLP-PROTOCOL.md is the wire contract this
+        firmware implements, and main/jlp/ is where this repo's player code
+        comes from. A change to a widget kind, field or endpoint here must
+        match the protocol there.
+    - repository: signalk-espOS/signalk-espos-hmi-designer
+      instructions: >-
+        The designer that pushes layouts. It reads /hello (display size,
+        widget kinds and their fields, firmware version >= 0.1.0) and refuses
+        kinds and fields the device does not advertise.
