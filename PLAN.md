@@ -19,7 +19,7 @@ flashen.
 | UI | JLP-Gerät (JSON Layout Player) nach `JLP-PROTOCOL.md` des P4-Cockpits, LVGL 9 |
 | Code aus dem Cockpit | erlaubt; das Cockpit steht seit 2026-11-01 unter Apache-2.0 (`c3eaeed`, PR #198) |
 | Lizenz dieses Repos | Apache-2.0, auch für die übernommenen Cockpit-Dateien |
-| Repo | `espos-m5-tough` im eigenen GitHub-Account (`Colug0`); war bis zum Lizenzwechsel privat |
+| Repo | `espos-m5-tough` im eigenen GitHub-Account (`Colug0`); privat bis zum Lizenzwechsel, öffentlich seit 2026-11-01 (vom Eigner freigegeben) |
 | Firmware-Name | CMake `project(m5_tough)`. Er wird nie mehr geändert, weil OTA ihn prüft |
 | Einbau | unter Deck, Versorgung über 12 V an der Klemme, RS485 vorerst ungenutzt |
 | Helligkeit | manuell (Regler `@brightness`) und automatisch (Nachtdimmung über `environment.mode`, Dimmen bei Inaktivität) |
@@ -154,7 +154,7 @@ Ton-Regeln pro Pfad sind zurückgestellt.
       Veröffentlichung, oder eine schriftliche Erlaubnis bis dahin
 - [ ] GitHub-Repo `espos-m5-tough` im eigenen Account anlegen, privat
 - [x] Nach Dirks Lizenzwechsel: SPDX-Köpfe der übernommenen Dateien auf Apache-2.0
-- [ ] Repo öffentlich stellen (nach Freigabe durch den Eigner)
+- [x] Repo öffentlich stellen (vom Eigner freigegeben, 2026-11-01)
 - [x] Lokales Git-Repo (`main`), `LICENSE` (Apache-2.0), `README.md`
 - [x] `AGENTS.md` + `CLAUDE.md` (`@AGENTS.md`), `.gitattributes` (`eol=lf`),
       `.gitignore` (`*.pem`, `sdkconfig.local`, `build*/`, `managed_components/`)

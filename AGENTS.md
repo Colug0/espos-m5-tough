@@ -124,8 +124,9 @@ permissive.
 * Before opening a PR, review the committed diff yourself, then run
   CodeRabbit: `cr review --agent --committed --base-commit "$(git merge-base origin/main HEAD)"`
   and keep the output (`coderabbit-cli` skill).
-* CodeRabbit does not review on its own while the repo has fewer than 10
-  stars (and gives only summaries on a private repo). Comment
+* Whether CodeRabbit reviews on its own depends on the plan and the repo's
+  visibility (docs.coderabbit.ai, "Plans"; in November 2026 the open-source
+  plan reviewed repos under 10 stars only on request). Comment
   `@coderabbitai review` on the PR to start one.
 
 ## Pull requests to other repos
