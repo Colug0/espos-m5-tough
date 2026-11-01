@@ -16,11 +16,12 @@ static const char* TAG = "jlp.store";
 namespace jlp {
 
 namespace {
-// Dedicated NVS partition (see p4_16mb.csv). Isolated from the system
-// "nvs" partition that holds WiFi creds so a layout write can never
-// crowd those out. LittleFS was abandoned here: on this flash it did
-// not survive a power-cycle — the superblock came back unmountable and
-// got silently reformatted, dropping the persisted layout every time.
+// Dedicated NVS partition (see partitions-16mb.csv). Isolated from the
+// system "nvs" partition that holds WiFi creds so a layout write can
+// never crowd those out. The cockpit abandoned LittleFS: on the P4's
+// flash it did not survive a power-cycle — the superblock came back
+// unmountable and got silently reformatted, dropping the persisted
+// layout every time.
 // NVS is wear-leveled and power-fail-safe.
 constexpr const char* kPartition = "layout";
 constexpr const char* kNamespace = "jlp";

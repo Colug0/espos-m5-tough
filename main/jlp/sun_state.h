@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include <atomic>
+
 namespace jlp {
 
 /** Day / night classifier driven by SignalK `environment.mode`
@@ -39,7 +41,8 @@ class SunState {
   void set_mode(const char* mode);
 
  private:
-  DayNight state_ = DayNight::Unknown;
+  // Written on the Signal K stream task, read from the UI task.
+  std::atomic<DayNight> state_{DayNight::Unknown};
 };
 
 SunState& sun_state();

@@ -5,6 +5,7 @@
 #include "subject_registry.h"
 
 #include <ArduinoJson.h>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -33,9 +34,15 @@ void on_update(const espos_sk_update_t* u, void* arg) {
     std::string v(u->value_json);
     tough_hal::ui::post([entry, v = std::move(v)]() {
       lv_subject_t* s = entry->subject;
+      if (v != "null") entry->has_stream_value = true;
       switch (entry->kind) {
         case SubjectKind::Float:
-          if (v != "null") lv_subject_set_float(s, strtof(v.c_str(), nullptr));
+          if (v != "null") {
+            // strtof takes "inf", "nan" and 1e999 (+Inf); no observer
+            // (bar, arc, zone match, label) is ready for a non-finite value.
+            const float f = strtof(v.c_str(), nullptr);
+            if (std::isfinite(f)) lv_subject_set_float(s, f);
+          }
           break;
         case SubjectKind::Int:
           if (v != "null") lv_subject_set_int(s, (int)strtol(v.c_str(), nullptr, 10));
@@ -180,6 +187,11 @@ std::optional<SubjectKind> SubjectRegistry::kind_of(
   return it->second.entry->kind;
 }
 
+bool SubjectRegistry::has_stream_value(const std::string& path) const {
+  auto it = map_.find(path);
+  return it != map_.end() && it->second.entry->has_stream_value;
+}
+
 std::vector<std::string> SubjectRegistry::paths() const {
   std::vector<std::string> out;
   out.reserve(map_.size());
@@ -201,6 +213,9 @@ void SubjectRegistry::garbage_collect(
     if (!live && slot.sub_handle > 0) {
       espos_sk_unsubscribe(slot.sub_handle);
       slot.sub_handle = 0;
+      // Its value goes stale from here; a later layout's REST seed may
+      // replace it again.
+      slot.entry->has_stream_value = false;
     } else if (live && slot.sub_handle <= 0 && !is_local_sentinel(kv.first)) {
       slot.sub_handle = espos_sk_subscribe(kv.first.c_str(), kListenPeriodMs, on_update, slot.entry.get());
     }

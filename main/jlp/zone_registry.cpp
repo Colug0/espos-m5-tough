@@ -91,10 +91,8 @@ void ZoneRegistry::apply_meta(const std::string& path,
     for (JsonObjectConst z : zarr) {
       // SK convention: a missing `lower` means "-infinity" (the zone
       // covers everything below `upper`); a missing `upper` means
-      // "+infinity". Defaulting both to 0 was a bug — every
-      // single-sided zone (the common case for alarm thresholds)
-      // collapsed to lower==upper==0 and matched nothing, so the
-      // firmware never tinted bound widgets.
+      // "+infinity". Single-sided zones are the common case for alarm
+      // thresholds.
       zs.push_back({z["lower"] | -1e30f, z["upper"] | 1e30f,
                     parse_state(z["state"] | "normal")});
     }
@@ -103,23 +101,16 @@ void ZoneRegistry::apply_meta(const std::string& path,
   }
   // No per-path logging here — apply_meta fires once per bound path in
   // a burst right after every layout push (sendMeta=all rebroadcast),
-  // and the remote-log TCP write per line was itself a meaningful chunk
-  // of the UI-task stall we care about avoiding.
+  // and a remote-log write per line would stall the UI task.
   if (!changed) return;
   // Notify the bound subject so widget observers re-fire and pick
   // up the just-loaded description / zones. The observer reads
   // description() first and prefers it over the formatted value,
-  // so a label that initially rendered "0.0" (built before the
-  // fetch ran) will swap to "Vorpiek Port" / "Main STB" / etc.
-  // here. zone-tinted bars likewise pick up freshly-loaded zone
-  // bounds without waiting for the next value delta.
-  //
-  // The earlier worry was that observer-fire-on-meta would
-  // overwrite a stale-but-correct rendering with a stale zero.
-  // build_label now pre-seeds the label text from
-  // zones().description() at construction time, so even if no
-  // value ever arrives, the label is legible immediately when
-  // its meta loads.
+  // so a label built before the fetch ran swaps to its description
+  // here, and zone-tinted bars pick up the zone bounds without
+  // waiting for the next value delta. build_label also seeds the
+  // label from zones().description(), so a label is legible even
+  // if no value ever arrives.
   lv_subject_t* sub = registry().lookup(path);
   if (sub) lv_subject_notify(sub);
 }

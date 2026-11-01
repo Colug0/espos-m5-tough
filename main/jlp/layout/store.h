@@ -10,17 +10,17 @@
 namespace jlp {
 
 // On-device persistence for the active layout. Stored as a single NVS
-// blob in a dedicated "layout" NVS partition (see p4_16mb.csv). NVS
-// replaced LittleFS here because LittleFS on this flash did not survive
-// a power-cycle — the partition came back unmountable and was silently
-// reformatted, dropping the persisted layout.
+// blob in a dedicated "layout" NVS partition (see partitions-16mb.csv).
+// The cockpit replaced LittleFS with NVS because LittleFS on the P4's
+// flash did not survive a power-cycle — the partition came back
+// unmountable and was silently reformatted, dropping the persisted layout.
 
-// Mount the partition. Idempotent. Returns false on failure.
+// Initialise the partition. Idempotent. Returns false on failure.
 bool store_init();
 
-// One-line summary of what store_init() observed at boot (mount
-// used-bytes, whether a layout was preserved/restored, reformats).
-// Surfaced via /hello for diagnostics when serial isn't available.
+// One-line summary of what store_init() observed at boot:
+// "nvs ok layout_sz=N" or "nvs init failed: <error>". Surfaced via
+// /hello for diagnostics when serial isn't available.
 const char* store_boot_report();
 
 // Returns true and fills `out` if a layout blob is stored. False if
@@ -31,10 +31,11 @@ bool store_read(std::string* out);
 // stages the value and nvs_commit makes it visible in one step, so a
 // power loss mid-write leaves the prior value intact (no tmp/rename
 // needed). Returns false on any NVS error. Caller must only call this
-// after a successful layout swap. (Name kept for the unchanged caller.)
+// after a successful layout swap.
 bool store_write_atomic(const std::string& json);
 
-// Remove the persisted layout. Called by main.cpp on boot when the
+// Remove the persisted layout. Called by player_up() in
+// main/app_main.cpp on boot when the
 // stored layout fails to apply, so subsequent boots skip straight to
 // the compiled default instead of re-trying the same bad blob.
 // Returns true if the blob was erased or wasn't there to begin with;

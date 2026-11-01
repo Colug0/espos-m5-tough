@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include "tough_hal/board.h"
 #include "tough_hal/ui.h"
 
 #include "../features.h"
@@ -59,6 +60,52 @@ namespace {
 
 constexpr size_t kMaxBodyBytes = 64 * 1024;
 
+// A client that sends a Content-Length and then stops would hold the one
+// httpd task in the receive loop for good (lru_purge cannot reclaim a socket
+// whose handler is running). Give up after this many receive timeouts
+// (recv_wait_timeout each) and answer 408.
+constexpr int kMaxRecvTimeouts = 2;
+
+// What a handler waits on while its lambda runs on the UI task. Shared with
+// the lambda: a handler that times out returns, but the lambda is still
+// queued and gives the semaphore later, so it must outlive both sides.
+// `state` settles which side was last when the handler gave up.
+struct UiHop {
+  enum : int { kPending = 0, kDone = 1, kAbandoned = 2 };
+  SemaphoreHandle_t sem = xSemaphoreCreateBinary();
+  std::atomic<int> state{kPending};
+  UiHop() = default;
+  UiHop(const UiHop&) = delete;
+  UiHop& operator=(const UiHop&) = delete;
+  ~UiHop() {
+    if (sem) vSemaphoreDelete(sem);
+  }
+};
+
+// Reads exactly content_len bytes of the request body into *body. On failure
+// it has already answered the request and returns false.
+bool recv_body(httpd_req_t* req, std::string* body) {
+  body->resize(req->content_len);
+  int total = 0;
+  int timeouts = 0;
+  while (total < req->content_len) {
+    int n = httpd_req_recv(req, &(*body)[total], req->content_len - total);
+    if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < kMaxRecvTimeouts) continue;
+    if (n == HTTPD_SOCK_ERR_TIMEOUT) {
+      httpd_resp_set_status(req, "408 Request Timeout");
+      httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"body not received\"}");
+      return false;
+    }
+    if (n <= 0) {
+      httpd_resp_set_status(req, "500 Internal Server Error");
+      httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"recv failed\"}");
+      return false;
+    }
+    total += n;
+  }
+  return true;
+}
+
 esp_err_t layout_post(httpd_req_t* req) {
   if (req->content_len == 0) {
     httpd_resp_set_status(req, "400 Bad Request");
@@ -72,32 +119,21 @@ esp_err_t layout_post(httpd_req_t* req) {
   }
 
   std::string body;
-  body.resize(req->content_len);
-  int total = 0;
-  while (total < req->content_len) {
-    int n = httpd_req_recv(req, &body[total], req->content_len - total);
-    if (n <= 0) {
-      if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
-      httpd_resp_set_status(req, "500 Internal Server Error");
-      httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"recv failed\"}");
-      return ESP_FAIL;
-    }
-    total += n;
-  }
+  if (!recv_body(req, &body)) return ESP_FAIL;
 
   // Hop onto the UI task to do the swap, then wait for the
   // result. The handler is design-time only — brief blocking is fine.
   auto result = std::make_shared<ApplyResult>();
-  SemaphoreHandle_t done = xSemaphoreCreateBinary();
-  if (!done) {
+  auto hop = std::make_shared<UiHop>();
+  if (!hop->sem) {
     httpd_resp_set_status(req, "500 Internal Server Error");
     httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"semaphore\"}");
     return ESP_FAIL;
   }
 
-  tough_hal::ui::post([body, result, done]() mutable {
+  tough_hal::ui::post([body = std::move(body), result, hop]() mutable {
     *result = layout_manager().apply(body, ApplySource::PostLayout);
-    xSemaphoreGive(done);
+    xSemaphoreGive(hop->sem);
   });
 
   // 25s budget for the apply: build is fast (~hundreds of ms for a
@@ -106,14 +142,13 @@ esp_err_t layout_post(httpd_req_t* req) {
   // covers that drain without giving up on a healthy layout. The
   // designer-side proxy timeout is 30s, which leaves room for the
   // 504 to actually reach the browser instead of being aborted.
-  if (xSemaphoreTake(done, pdMS_TO_TICKS(25000)) != pdTRUE) {
-    vSemaphoreDelete(done);
+  if (xSemaphoreTake(hop->sem, pdMS_TO_TICKS(25000)) != pdTRUE) {
+    // The apply is still queued and will run (and persist) later.
     httpd_resp_set_status(req, "504 Gateway Timeout");
-    httpd_resp_sendstr(req,
-                       "{\"ok\":false,\"err\":\"apply timed out\"}");
+    httpd_resp_sendstr(
+        req, "{\"ok\":false,\"err\":\"apply timed out; it may still apply\"}");
     return ESP_OK;
   }
-  vSemaphoreDelete(done);
 
   httpd_resp_set_type(req, "application/json");
   // Build responses via ArduinoJson so user-controlled strings
@@ -308,17 +343,16 @@ esp_err_t mic_probe4_get(httpd_req_t* req) {
 //
 // GET /screenshot                — JPEG (default; cheap enough for the
 //                                  designer's live-mirror poll).
-// GET /screenshot?fmt=bmp        — 16-bit BMP, raw RGB565. Larger and
-//                                  slower (~1.2 MB at 1024x600, ~6 s
-//                                  over esp_hosted SDIO) but
-//                                  bit-perfect and decodes natively in
-//                                  any browser; kept for debug diffs.
+// GET /screenshot?fmt=bmp        — 16-bit BMP, raw RGB565. Larger
+//                                  (150 KB at 320x240) but bit-perfect
+//                                  and decodes natively in any browser;
+//                                  kept for debug diffs.
 // GET /screenshot?fmt=jpeg       — explicit JPEG; same as no arg.
 //
-// JPEG uses the espressif/esp_new_jpeg software encoder (no HW JPEG on
-// P4 today). RGB565 → JPEG at quality 70 is ~30-50 KB for our 1024×600
-// frame and encodes in well under a second, which is fast enough for
-// 1-2 fps polling from the designer.
+// JPEG uses the espressif/esp_new_jpeg software encoder (the classic
+// ESP32 has no JPEG hardware). It runs on the httpd task, not the UI
+// task, at quality 70, which is fast enough for the designer's 1-2 fps
+// mirror poll.
 
 // Builds a 70-byte BMP header for a width*height image stored as
 // 16-bit RGB565 with bit masks. BMP rows are bottom-up.
@@ -407,11 +441,10 @@ static void take_screenshot(ScreenshotResult* out) {
 // >100 ms vs ~1 ms open/close, and statelessness keeps things safe
 // across concurrent /screenshot requests.
 //
-// The precompiled esp_new_jpeg blob shipped for P4 only accepts
-// JPEG_PIXEL_FORMAT_RGB888 input (RGB565_LE errors with "src type
-// error" at jpeg_enc_open). Convert RGB565 → RGB888 in PSRAM before
-// encoding; the conversion is ~1.8 MB for a 1024x600 frame and runs in
-// under 10 ms.
+// esp_new_jpeg rejected RGB565_LE input on the cockpit's P4 ("src type
+// error" at jpeg_enc_open), so the frame goes through RGB888 in PSRAM
+// first, as there; at 320x240 that buffer is 225 KB. The encoder's own
+// work buffers are moved to PSRAM by main/jpeg_psram.c.
 static bool encode_rgb565_to_jpeg(const ScreenshotResult& src,
                                   std::vector<uint8_t>* out,
                                   std::string* err) {
@@ -479,17 +512,19 @@ static bool encode_rgb565_to_jpeg(const ScreenshotResult& src,
   return true;
 }
 
-// Single-flight guard. Each screenshot takes an lv_snapshot (1.2 MB
-// PSRAM alloc) + JPEG encode on the UI task — hundreds of ms
-// each. The designer's live-mirror mode polls /screenshot in a tight
+// Single-flight guard. Each screenshot takes an lv_snapshot on the UI
+// task (150 KB in PSRAM at 320x240) and then a JPEG encode on the httpd
+// task. The designer's live-mirror mode polls /screenshot in a tight
 // loop; if several requests arrive faster than the UI task can serve
 // them they stack up as deferred tasks and starve everything else on
-// the UI task (layout apply, the n2k heartbeat, the notifications
-// drain). A push during that window times out -> "device proxy 504".
+// the UI task (layout apply, the notifications drain). A push during
+// that window times out -> "device proxy 504".
 //
 // Serve at most one screenshot at a time. A second concurrent request
 // gets 429 immediately instead of queuing more UI-task work; the
-// mirror loop just retries on its next iteration.
+// mirror loop just retries on its next iteration. A request that gave
+// up waiting leaves the flag to its snapshot, which clears it when it
+// has run.
 static std::atomic<bool> g_screenshot_busy{false};
 
 // Internal byte-addressable RAM at one point of a screenshot, in KB: the pool
@@ -512,9 +547,13 @@ esp_err_t screenshot_get(httpd_req_t* req) {
     httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"screenshot in flight\"}");
     return ESP_OK;
   }
-  // RAII-style release: any return path below clears the flag.
+  // RAII-style release: any return path below clears the flag, except a
+  // timeout that hands it to the still-queued snapshot.
   struct BusyGuard {
-    ~BusyGuard() { g_screenshot_busy.store(false); }
+    bool release = true;
+    ~BusyGuard() {
+      if (release) g_screenshot_busy.store(false);
+    }
   } busy_guard;
 
   // Pick format from `?fmt=`. Default jpeg — that's what the designer's
@@ -533,23 +572,30 @@ esp_err_t screenshot_get(httpd_req_t* req) {
 
   const HeapMark m_start = heap_mark();
   auto result = std::make_shared<ScreenshotResult>();
-  SemaphoreHandle_t done = xSemaphoreCreateBinary();
-  if (!done) {
+  auto hop = std::make_shared<UiHop>();
+  if (!hop->sem) {
     httpd_resp_set_status(req, "500 Internal Server Error");
     httpd_resp_sendstr(req, "semaphore alloc failed");
     return ESP_FAIL;
   }
-  tough_hal::ui::post([result, done]() {
+  tough_hal::ui::post([result, hop]() {
     take_screenshot(result.get());
-    xSemaphoreGive(done);
+    int expected = UiHop::kPending;
+    if (!hop->state.compare_exchange_strong(expected, UiHop::kDone)) {
+      // The handler has given up and left the busy flag to us.
+      g_screenshot_busy.store(false);
+    }
+    xSemaphoreGive(hop->sem);
   });
-  if (xSemaphoreTake(done, pdMS_TO_TICKS(5000)) != pdTRUE) {
-    vSemaphoreDelete(done);
+  if (xSemaphoreTake(hop->sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
+    int expected = UiHop::kPending;
+    if (hop->state.compare_exchange_strong(expected, UiHop::kAbandoned)) {
+      busy_guard.release = false;
+    }
     httpd_resp_set_status(req, "504 Gateway Timeout");
     httpd_resp_sendstr(req, "snapshot timeout");
     return ESP_OK;
   }
-  vSemaphoreDelete(done);
 
   if (!result->ok) {
     httpd_resp_set_status(req, "500 Internal Server Error");
@@ -654,18 +700,8 @@ static esp_err_t screen_post(httpd_req_t* req) {
     return ESP_OK;
   }
 
-  std::string body(req->content_len, '\0');
-  int total = 0;
-  while (total < req->content_len) {
-    int n = httpd_req_recv(req, &body[total], req->content_len - total);
-    if (n <= 0) {
-      if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
-      httpd_resp_set_status(req, "500 Internal Server Error");
-      httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"recv failed\"}");
-      return ESP_FAIL;
-    }
-    total += n;
-  }
+  std::string body;
+  if (!recv_body(req, &body)) return ESP_FAIL;
 
   JsonDocument doc;
   if (deserializeJson(doc, body) != DeserializationError::Ok) {
@@ -687,25 +723,23 @@ static esp_err_t screen_post(httpd_req_t* req) {
   auto found = std::make_shared<bool>(false);
   auto active = std::make_shared<std::string>();
   auto known = std::make_shared<std::vector<std::string>>();
-  SemaphoreHandle_t done = xSemaphoreCreateBinary();
-  if (!done) {
+  auto hop = std::make_shared<UiHop>();
+  if (!hop->sem) {
     httpd_resp_set_status(req, "500 Internal Server Error");
     httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"semaphore\"}");
     return ESP_FAIL;
   }
-  tough_hal::ui::post([want, found, active, known, done]() {
+  tough_hal::ui::post([want, found, active, known, hop]() {
     *found = layout_manager().select_screen(want);
     *active = layout_manager().active_screen();
     *known = layout_manager().screen_ids();
-    xSemaphoreGive(done);
+    xSemaphoreGive(hop->sem);
   });
-  if (xSemaphoreTake(done, pdMS_TO_TICKS(5000)) != pdTRUE) {
-    vSemaphoreDelete(done);
+  if (xSemaphoreTake(hop->sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
     httpd_resp_set_status(req, "504 Gateway Timeout");
     httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"select timed out\"}");
     return ESP_OK;
   }
-  vSemaphoreDelete(done);
 
   if (!*found) {
     JsonDocument out;
@@ -778,19 +812,18 @@ esp_err_t hello_get(httpd_req_t* req) {
   {
     auto active = std::make_shared<std::string>();
     auto ids = std::make_shared<std::vector<std::string>>();
-    SemaphoreHandle_t done = xSemaphoreCreateBinary();
-    if (done) {
-      tough_hal::ui::post([active, ids, done]() {
+    auto hop = std::make_shared<UiHop>();
+    if (hop->sem) {
+      tough_hal::ui::post([active, ids, hop]() {
         *active = layout_manager().active_screen();
         *ids = layout_manager().screen_ids();
-        xSemaphoreGive(done);
+        xSemaphoreGive(hop->sem);
       });
-      if (xSemaphoreTake(done, pdMS_TO_TICKS(2000)) == pdTRUE) {
+      if (xSemaphoreTake(hop->sem, pdMS_TO_TICKS(2000)) == pdTRUE) {
         resp["active_screen"] = *active;
         JsonArray arr = resp["screens"].to<JsonArray>();
         for (const auto& s : *ids) arr.add(s);
       }
-      vSemaphoreDelete(done);
     }
   }
 #if JLP_VOICE
@@ -803,20 +836,20 @@ esp_err_t hello_get(httpd_req_t* req) {
   audio_state["volume"] = jlp::voice().volume();
 #endif
   JsonObject display = resp["display"].to<JsonObject>();
-  // Report the live panel geometry from the active board HAL so the
-  // designer maps its canvas to the real resolution (720x720 on the
-  // 4B, 1024x600 on the 7B). Fall back to the 7B size only if the
-  // driver isn't wired yet, which can't happen once /hello serves.
+  // Report the live panel geometry from the board HAL so the designer
+  // maps its canvas to the real resolution. Fall back to the panel's
+  // fixed size only if the driver isn't wired yet, which can't happen
+  // once /hello serves.
   if (auto* d = tough_hal::ui::display()) {
     display["w"] = d->width();
     display["h"] = d->height();
   } else {
     // Shouldn't be reachable once /hello serves; log it so a future
-    // boot-order regression is visible instead of silently handing the
-    // designer the wrong board's resolution.
-    ESP_LOGW(TAG, "get_display() null in /hello; falling back to 1024x600");
-    display["w"] = 1024;
-    display["h"] = 600;
+    // boot-order regression is visible.
+    ESP_LOGW(TAG, "get_display() null in /hello; falling back to %ux%u",
+             (unsigned)tough_hal::kLcdWidth, (unsigned)tough_hal::kLcdHeight);
+    display["w"] = tough_hal::kLcdWidth;
+    display["h"] = tough_hal::kLcdHeight;
   }
   display["idle_timeout"] = true;
   display["idle_dim_pct"] = true;

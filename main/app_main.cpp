@@ -62,7 +62,7 @@ namespace ui = tough_hal::ui;
 tough_hal::ToughDisplay s_display;
 tough_hal::ToughTouch s_touch;
 tough_hal::ToughAudio s_audio;
-bool s_panel_up = false;
+std::atomic<bool> s_panel_up{false};
 bool s_boot_fetch_done = false;
 bool s_sk_connected = false;
 

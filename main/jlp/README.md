@@ -26,6 +26,12 @@ so in its header. What changed for the M5Stack Tough:
 | Boot layout from `applicationData/global/m5-tough/1/layout.json` instead of `…/p4-cockpit/…` (JLP-PROTOCOL.md says `<hostname>`; both firmwares use a fixed application id) | `net/layout_fetch.cpp` |
 | The `screenshot[jpeg]` log line carries internal RAM free/largest (KB) at start, after the snapshot, after encoding and after sending | `net/http_api.cpp` |
 | The zone and layout fetch tasks log their stack high-water mark when they end | `net/zone_fetch.cpp`, `net/layout_fetch.cpp` |
+| Tab strip and pages in a flex column, so the strip never covers a page | `layout/layout_manager.cpp` |
+| HTTP handlers: the semaphore a handler waits on is shared with the UI-task lambda, so a timeout leaves no dangling handle; a stalled request body gives 408 after two receive timeouts; a timed-out screenshot keeps the single-flight flag until its snapshot has run | `net/http_api.cpp` |
+| Non-finite numbers from Signal K are dropped; a REST seed no longer overwrites a newer stream value; the int seed is clamped before the cast | `subject_registry.*`, `net/zone_fetch.cpp` |
+| The ACK echo guard expires after 10 s, so an ACK that was never sent cannot hide the real clear | `notifications_registry.*` |
+| `SunState` keeps its state in a `std::atomic` (stream task writes, UI task reads) | `sun_state.*` |
+| Comments that described the P4 or the cockpit's history rewritten for this board | `layout/store.*`, `net/http_api.cpp`, `net/zone_fetch.cpp`, `zone_registry.cpp` |
 
 The guards instead of deletions keep the files close to the cockpit's, so a
 fix can travel in either direction and the player can become a shared
