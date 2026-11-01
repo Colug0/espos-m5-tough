@@ -25,8 +25,9 @@ namespace axp192 {
 esp_err_t init();
 
 /// Pulse the LCD and touch reset lines, then wait until the panel accepts
-/// commands again.
-void reset_lcd_and_touch();
+/// commands again. Returns the first failed I2C write; the lines may then be
+/// left low.
+esp_err_t reset_lcd_and_touch();
 
 /// Backlight 0-100 %. 0 switches LDO3 off; 1-100 maps onto the 2.5-3.3 V
 /// range in which the backlight is lit.

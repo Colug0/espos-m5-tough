@@ -190,7 +190,10 @@ esp_err_t board_up(void*) {
     ESP_LOGE(TAG, "AXP192 init failed, running headless");
     return ESP_OK;
   }
-  tough_hal::axp192::reset_lcd_and_touch();
+  if (tough_hal::axp192::reset_lcd_and_touch() != ESP_OK) {
+    ESP_LOGE(TAG, "LCD/touch reset failed, running headless");
+    return ESP_OK;
+  }
   tough_hal::ui::start(&s_display, &s_touch);
   log_heap("ui");
   s_audio.init();

@@ -80,15 +80,17 @@ esp_err_t init() {
   return ESP_OK;
 }
 
-void reset_lcd_and_touch() {
-  update(kRegGpio34Out, 0xFD, 0x00);   // GPIO4 low
-  update(kRegGpio012Out, 0xFD, 0x00);  // GPIO1 low
+esp_err_t reset_lcd_and_touch() {
+  esp_err_t err;
+  if ((err = update(kRegGpio34Out, 0xFD, 0x00)) != ESP_OK) return err;   // GPIO4 low
+  if ((err = update(kRegGpio012Out, 0xFD, 0x00)) != ESP_OK) return err;  // GPIO1 low
   vTaskDelay(pdMS_TO_TICKS(2));
-  update(kRegGpio34Out, 0xFF, 0x02);
-  update(kRegGpio012Out, 0xFF, 0x02);
+  if ((err = update(kRegGpio34Out, 0xFF, 0x02)) != ESP_OK) return err;
+  if ((err = update(kRegGpio012Out, 0xFF, 0x02)) != ESP_OK) return err;
   // The panel reloads its registers for up to 120 ms after a reset
   // (ILI9342E datasheet 12.4); commands sent earlier may be lost.
   vTaskDelay(pdMS_TO_TICKS(120));
+  return ESP_OK;
 }
 
 void set_backlight(uint8_t pct) {
