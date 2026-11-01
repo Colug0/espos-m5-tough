@@ -60,11 +60,15 @@ namespace {
 
 constexpr size_t kMaxBodyBytes = 64 * 1024;
 
-// A client that sends a Content-Length and then stops would hold the one
-// httpd task in the receive loop for good (lru_purge cannot reclaim a socket
-// whose handler is running). Give up after this many receive timeouts
-// (recv_wait_timeout each) and answer 408.
-constexpr int kMaxRecvTimeouts = 2;
+// Seconds a request body may stall before the handler gives up with 408.
+// One httpd task serves every request, and lru_purge cannot reclaim a
+// socket whose handler is running, so a client that sends a Content-Length
+// and then stops blocks the whole API, the designer's mirror included, for
+// this long. httpd hands back body bytes that arrived with the headers
+// only after one more wait, so the worst case is twice this. A 64 KB
+// layout on the LAN arrives in well under a second; twice this stays
+// below the designer's 30 s proxy timeout.
+constexpr int kRecvWaitS = 10;
 
 // What a handler waits on while its lambda runs on the UI task. Shared with
 // the lambda: a handler that times out returns, but the lambda is still
@@ -87,10 +91,8 @@ struct UiHop {
 bool recv_body(httpd_req_t* req, std::string* body) {
   body->resize(req->content_len);
   int total = 0;
-  int timeouts = 0;
   while (total < req->content_len) {
     int n = httpd_req_recv(req, &(*body)[total], req->content_len - total);
-    if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < kMaxRecvTimeouts) continue;
     if (n == HTTPD_SOCK_ERR_TIMEOUT) {
       httpd_resp_set_status(req, "408 Request Timeout");
       httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"body not received\"}");
@@ -980,7 +982,7 @@ void http_api_start(uint16_t port) {
   config.server_port = port;
   config.stack_size = 8192;
   config.ctrl_port = 32768 + port;  // unique per httpd instance
-  config.recv_wait_timeout = 120;
+  config.recv_wait_timeout = kRecvWaitS;
   config.send_wait_timeout = 30;
   config.lru_purge_enable = true;
   // Keep ahead of the registrations below (9 today) — httpd aborts with
