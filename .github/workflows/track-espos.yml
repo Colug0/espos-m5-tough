@@ -128,7 +128,16 @@ jobs:
           if git ls-remote --exit-code --heads origin "track-espos-$TAG" >/dev/null; then
             # A branch with no PR is what a run that failed after its push
             # leaves behind. Nobody can have reviewed it, so start over. Only
-            # here, once the run is sure to push the branch again.
+            # here, once the run is sure to push the branch again. A branch
+            # with anyone else's commits on it is kept, as in the cleanup step
+            # below, and so is one whose commits cannot be read.
+            BOT="41898282+github-actions[bot]@users.noreply.github.com"
+            AUTHORS=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...track-espos-$TAG" \
+                        --jq '.commits[] | .commit.author.email, .commit.committer.email' \
+                        | sort -u) || AUTHORS=unknown
+            if [ "$AUTHORS" != "$BOT" ]; then
+              skip "track-espos-$TAG has no PR but carries commits beyond the bot's; keeping it."
+            fi
             echo "Removing track-espos-$TAG, left without a PR by an earlier run."
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/track-espos-$TAG"
           fi
