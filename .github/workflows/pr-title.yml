@@ -38,10 +38,11 @@ jobs:
           requireScope: false
           # A digit or symbol may lead ("10.1-inch panel"), a capital may not,
           # and 50 characters keeps the changelog entry on one line (AGENTS.md).
-          # Bots write their own titles and cannot be asked to shorten them:
-          # Dependabot names the package and both versions, and its ci bumps
-          # stay out of the changelog anyway.
-          subjectPattern: ${{ github.event.pull_request.user.type == 'Bot' && '^(?![A-Z]).+$' || '^(?![A-Z]).{1,50}$' }}
+          # Bots write their own titles and cannot be asked to change them:
+          # Dependabot names the package and both versions and starts with a
+          # capital ("ci: Bump ..."), and its ci bumps stay out of the
+          # changelog anyway. The type is still checked for them.
+          subjectPattern: ${{ github.event.pull_request.user.type == 'Bot' && '^.+$' || '^(?![A-Z]).{1,50}$' }}
           subjectPatternError: >-
             The subject "{subject}" must not start with a capital letter and
             must be at most 50 characters, e.g. "fix(upload): retry on 503".
