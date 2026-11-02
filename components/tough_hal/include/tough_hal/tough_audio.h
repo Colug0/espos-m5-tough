@@ -7,7 +7,8 @@
 #include "driver/i2s_std.h"
 #include "espos_audio/audio_driver.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 
 namespace tough_hal {
 
@@ -26,15 +27,25 @@ class ToughAudio : public espos_audio::AudioDriver {
 
  private:
   static constexpr uint32_t kRate = 16000;
+  static constexpr size_t kQueueLen = 4;
   struct Clip {
     int16_t* samples;
     size_t frames;
   };
   static void task(void* arg);
   void run();
+  bool pop(Clip* out);
+  size_t pending();
 
   i2s_chan_handle_t tx_ = nullptr;
-  QueueHandle_t queue_ = nullptr;
+  // Clips waiting to play. Producers and the audio task touch it only under
+  // lock_, so "full, drop the oldest" is one step that the audio task cannot
+  // interleave with; the task sleeps on a task notification.
+  SemaphoreHandle_t lock_ = nullptr;
+  TaskHandle_t task_ = nullptr;
+  Clip ring_[kQueueLen] = {};
+  size_t head_ = 0;
+  size_t count_ = 0;
   size_t ring_frames_ = 0;  // frames the I2S DMA ring holds
   std::atomic<bool> ready_{false};
   std::atomic<uint8_t> volume_{100};

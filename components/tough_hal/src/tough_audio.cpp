@@ -12,7 +12,6 @@ namespace tough_hal {
 
 namespace {
 const char* TAG = "audio";
-constexpr int kQueueLen = 4;
 // i2s_channel_write() returns once samples are in the DMA ring, not once they
 // have played. Before the amplifier goes off, a whole ring of silence plus
 // 20 ms is written, so the clip's tail has left the ring. Written in chunks of
@@ -50,10 +49,10 @@ void ToughAudio::init() {
     return;
   }
 
-  queue_ = xQueueCreate(kQueueLen, sizeof(Clip));
-  if (!queue_ ||
+  lock_ = xSemaphoreCreateMutex();
+  if (!lock_ ||
       xTaskCreatePinnedToCore(&ToughAudio::task, "audio", 3072, this, 4,
-                              nullptr, 1) != pdPASS) {
+                              &task_, 1) != pdPASS) {
     ESP_LOGE(TAG, "no memory for the audio task");
     return;
   }
@@ -73,21 +72,40 @@ void ToughAudio::play_pcm(const int16_t* samples, size_t frames) {
   for (size_t i = 0; i < frames; i++) {
     copy[i] = static_cast<int16_t>(samples[i] * vol / 100);
   }
-  Clip clip = {copy, frames};
-  // A full queue drops the oldest waiting clip, not this one: the newest
+  // A full ring drops the oldest waiting clip, not this one: the newest
   // chime belongs to the latest escalation, which may be an emergency
-  // arriving behind a run of alarms. The audio task may take a clip in
-  // between, so evict only while the queue is still full; two producers
-  // (UI task, /beep handler) can race too, so give up after two tries.
-  for (int tries = 0; tries < 2; ++tries) {
-    if (xQueueSend(queue_, &clip, 0) == pdTRUE) return;
-    Clip oldest;
-    if (uxQueueSpacesAvailable(queue_) == 0 &&
-        xQueueReceive(queue_, &oldest, 0) == pdTRUE) {
-      free(oldest.samples);
-    }
+  // arriving behind a run of alarms.
+  Clip evicted = {nullptr, 0};
+  xSemaphoreTake(lock_, portMAX_DELAY);
+  if (count_ == kQueueLen) {
+    evicted = ring_[head_];
+    head_ = (head_ + 1) % kQueueLen;
+    --count_;
   }
-  free(copy);
+  ring_[(head_ + count_) % kQueueLen] = {copy, frames};
+  ++count_;
+  xSemaphoreGive(lock_);
+  free(evicted.samples);
+  xTaskNotifyGive(task_);
+}
+
+bool ToughAudio::pop(Clip* out) {
+  xSemaphoreTake(lock_, portMAX_DELAY);
+  const bool any = count_ > 0;
+  if (any) {
+    *out = ring_[head_];
+    head_ = (head_ + 1) % kQueueLen;
+    --count_;
+  }
+  xSemaphoreGive(lock_);
+  return any;
+}
+
+size_t ToughAudio::pending() {
+  xSemaphoreTake(lock_, portMAX_DELAY);
+  const size_t n = count_;
+  xSemaphoreGive(lock_);
+  return n;
 }
 
 void ToughAudio::task(void* arg) { static_cast<ToughAudio*>(arg)->run(); }
@@ -98,8 +116,13 @@ void ToughAudio::run() {
   // with the next clip; a failed switch-off once a second until it holds.
   for (;;) {
     Clip clip;
-    if (xQueueReceive(queue_, &clip, amp_on ? pdMS_TO_TICKS(1000) : portMAX_DELAY) != pdTRUE) {
-      if (axp192::set_speaker(false) == ESP_OK) amp_on = false;
+    if (!pop(&clip)) {
+      // A clip queued after pop() leaves a notification pending, so this
+      // returns at once rather than missing it.
+      if (ulTaskNotifyTake(pdTRUE, amp_on ? pdMS_TO_TICKS(1000) : portMAX_DELAY) == 0 &&
+          axp192::set_speaker(false) == ESP_OK) {
+        amp_on = false;
+      }
       continue;
     }
     if (!amp_on && enabled_) {
@@ -115,7 +138,7 @@ void ToughAudio::run() {
                         &written, portMAX_DELAY);
     }
     free(clip.samples);
-    if (uxQueueMessagesWaiting(queue_) == 0 && amp_on) {
+    if (pending() == 0 && amp_on) {
       for (size_t left = ring_frames_ + kTailFrames; left > 0;) {
         const size_t n = left < kTailFrames ? left : kTailFrames;
         i2s_channel_write(tx_, kSilence, n * sizeof(int16_t), &written,
