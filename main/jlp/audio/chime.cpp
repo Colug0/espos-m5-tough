@@ -112,16 +112,15 @@ void pattern_for(NotState state, std::vector<Seg>& segs, float& amp) {
 }  // namespace
 
 void Chime::init(espos_audio::AudioDriver* audio) {
-  audio_ = audio;
   // Restore before any notification can fire, so a muted helm stays quiet
   // through the boot chime as well.
   muted_.store(store_flag_get(kChimeMutedKey, false));
-  if (!audio_) return;
+  if (!audio) return;
 
   // Built once here rather than per alarm: play() runs on the UI task,
   // where synthesis would delay the overlay and touch.
   const int64_t t0 = esp_timer_get_time();
-  const uint32_t rate = audio_->sample_rate();
+  const uint32_t rate = audio->sample_rate();
   auto wave = std::make_unique<Wave>();  // 1 KB, only while building
   size_t total = 0;
   for (int i = 0; i < 4; ++i) {
@@ -142,15 +141,17 @@ void Chime::init(espos_audio::AudioDriver* audio) {
   }
   ESP_LOGI(TAG, "tones ready: %u frames in %u ms", (unsigned)total,
            (unsigned)((esp_timer_get_time() - t0) / 1000));
+  audio_.store(audio, std::memory_order_release);
 }
 
 void Chime::play(NotState state, bool ignore_mute) {
-  if ((muted_ && !ignore_mute) || !audio_ || !audio_->ready()) return;
+  auto* audio = audio_.load(std::memory_order_acquire);
+  if ((muted_ && !ignore_mute) || !audio || !audio->ready()) return;
   const int i = static_cast<int>(state) - static_cast<int>(NotState::Alert);
   if (i < 0 || i >= 4 || clips_[i].empty()) return;  // Nominal / Normal
   ESP_LOGI(TAG, "chime %s (%u frames)", not_state_name(state),
            (unsigned)clips_[i].size());
-  audio_->play_pcm(clips_[i].data(), clips_[i].size());
+  audio->play_pcm(clips_[i].data(), clips_[i].size());
 }
 
 Chime& chime() {

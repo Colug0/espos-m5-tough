@@ -91,7 +91,8 @@ void NotificationsRegistry::apply(const std::string& path_after_prefix,
     }
     auto it = map_.find(path_after_prefix);
     if (it != map_.end() && it->second.state == n.state &&
-        it->second.message == n.message) {
+        it->second.message == n.message &&
+        it->second.wants_sound == n.wants_sound) {
       return;  // no change
     }
     map_[path_after_prefix] = n;
