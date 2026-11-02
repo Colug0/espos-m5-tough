@@ -259,14 +259,20 @@ Live-Daten vom Halpi2.
 - [ ] `@drop_here` (setzt den Anker am Halpi2 wirklich; zurückgestellt)
 - [x] `notifications`-Liste, Alarm-Overlay für 320×240, Chime: echte Test-Alarme
       (Warnung, Alarm, Notfall) vom Halpi2 mit Ton und Quittieren (#5)
-- [ ] `@audio_mute` am Gerät prüfen
+- [x] `@audio_mute` am Gerät geprüft: Overlay ja, Ton nein
 - [x] `@brightness` über AXP192 LDO3 (manuell): 9 Stufen von 2,5 bis 3,3 V, die
       5-%-Stufe reicht nachts
-- [ ] Idle-Dimmer und Nachtdimmung über `environment.mode` bei Nacht prüfen
+- [x] Idle-Dimmer und Nachtdimmung über `environment.mode` bei Nacht geprüft
+      (60 s Leerlauf: Backlight aus, Antippen: zurück auf die eingestellte Helligkeit)
 - [x] `/screenshot` (JPEG und BMP) für den Mirror-Modus, `POST /screen`
 
 **Fertig, wenn:** Ein Tough-Layout mit Anker, SoC, Wind und Notifications läuft
 eine Nacht lang am Halpi2 ohne Neustart.
+
+- [x] Nachttest 2./3. November 2026: 12,5 h ohne Neustart und ohne Core-Dump,
+      WLAN und Signal K-Stream durchgehend verbunden (0 WLAN-Abbrüche, 0
+      Sendefehler, 302 865 Frames empfangen), alle Health-Werte normal, interner
+      RAM-Tiefstwert 37 KB wie im Tagbetrieb
 
 ### Phase 4: Release und Flotte
 
