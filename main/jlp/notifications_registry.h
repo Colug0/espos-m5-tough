@@ -72,8 +72,8 @@ struct Notification {
 };
 
 /** Tracks the live set of `notifications.*` paths broadcast by SK.
- *  Fires on_change(...) whenever the set or any entry's state
- *  changes; consumers (alert overlay, list widget) re-query the
+ *  Fires on_change(...) whenever the set changes or an entry's
+ *  state, message or sound request changes; consumers (alert overlay, list widget) re-query the
  *  registry on each change. */
 class NotificationsRegistry {
  public:

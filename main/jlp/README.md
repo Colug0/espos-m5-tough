@@ -30,6 +30,8 @@ so in its header. What changed for the M5Stack Tough:
 | HTTP handlers: the semaphore a handler waits on is shared with the UI-task lambda, so a timeout leaves no dangling handle; a request body that stalls for 10 s gives 408 (receive timeout 10 s instead of 120 s); a timed-out screenshot keeps the single-flight flag until its snapshot has run | `net/http_api.cpp` |
 | Non-finite numbers from Signal K are dropped; a REST seed no longer overwrites a newer stream value; the int seed is clamped before the cast | `subject_registry.*`, `net/zone_fetch.cpp` |
 | `zones: []` removes a path's zones instead of keeping the old ones | `zone_registry.cpp` |
+| The notification log line says whether the source asked for sound (`sound`/`silent`) | `notifications_registry.cpp` |
+| Chime tones at 1.6-2.6 kHz, shaped towards a square, alarms at full scale and longer, for the Tough's small speaker | `audio/chime.cpp` |
 | The ACK echo guard expires after 10 s, so an ACK that was never sent cannot hide the real clear | `notifications_registry.*` |
 | `SunState` keeps its state in a `std::atomic` (stream task writes, UI task reads) | `sun_state.*` |
 | Comments that described the P4 or the cockpit's history rewritten for this board | `layout/store.*`, `net/http_api.cpp`, `net/zone_fetch.cpp`, `zone_registry.cpp` |

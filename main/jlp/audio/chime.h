@@ -5,6 +5,8 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <vector>
 
 #include "espos_audio/audio_driver.h"
 
@@ -35,7 +37,10 @@ class Chime {
 
   /// True if a working audio sink is wired (for the /hello status +
   /// /beep probe). False on a speaker-less board or a failed codec init.
-  bool audio_ready() const { return audio_ && audio_->ready(); }
+  bool audio_ready() const {
+    auto* a = audio_.load(std::memory_order_acquire);
+    return a && a->ready();
+  }
 
   /// Force an alarm-severity tone regardless of gating. Drives the
   /// /beep diagnostic endpoint so audibility can be tested over HTTP
@@ -53,8 +58,14 @@ class Chime {
   bool muted() const { return muted_; }
 
  private:
-  espos_audio::AudioDriver* audio_ = nullptr;
+  // Published by init() only after clips_ is built: /beep can call play()
+  // from the httpd task while the UI task is still in init().
+  std::atomic<espos_audio::AudioDriver*> audio_{nullptr};
   std::atomic_bool muted_{false};
+  // One clip per sounding state (Alert..Emergency), synthesised once in
+  // init() and read-only afterwards, so play() needs no lock and costs the
+  // UI task nothing beyond handing the clip over.
+  std::vector<int16_t> clips_[4];
 };
 
 Chime& chime();
