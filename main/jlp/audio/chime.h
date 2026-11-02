@@ -5,6 +5,8 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <vector>
 
 #include "espos_audio/audio_driver.h"
 
@@ -55,6 +57,10 @@ class Chime {
  private:
   espos_audio::AudioDriver* audio_ = nullptr;
   std::atomic_bool muted_{false};
+  // One clip per sounding state (Alert..Emergency), synthesised once in
+  // init() and read-only afterwards, so play() needs no lock and costs the
+  // UI task nothing beyond handing the clip over.
+  std::vector<int16_t> clips_[4];
 };
 
 Chime& chime();
