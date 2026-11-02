@@ -76,13 +76,18 @@ void ToughAudio::play_pcm(const int16_t* samples, size_t frames) {
   Clip clip = {copy, frames};
   // A full queue drops the oldest waiting clip, not this one: the newest
   // chime belongs to the latest escalation, which may be an emergency
-  // arriving behind a run of alarms. Two callers can race here (UI task
-  // and the /beep handler), so a send that still fails gives up.
-  if (xQueueSend(queue_, &clip, 0) != pdTRUE) {
+  // arriving behind a run of alarms. The audio task may take a clip in
+  // between, so evict only while the queue is still full; two producers
+  // (UI task, /beep handler) can race too, so give up after two tries.
+  for (int tries = 0; tries < 2; ++tries) {
+    if (xQueueSend(queue_, &clip, 0) == pdTRUE) return;
     Clip oldest;
-    if (xQueueReceive(queue_, &oldest, 0) == pdTRUE) free(oldest.samples);
-    if (xQueueSend(queue_, &clip, 0) != pdTRUE) free(copy);
+    if (uxQueueSpacesAvailable(queue_) == 0 &&
+        xQueueReceive(queue_, &oldest, 0) == pdTRUE) {
+      free(oldest.samples);
+    }
   }
+  free(copy);
 }
 
 void ToughAudio::task(void* arg) { static_cast<ToughAudio*>(arg)->run(); }
