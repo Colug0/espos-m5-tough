@@ -243,8 +243,9 @@ und ein Testton laufen, und die Speichertabelle hier steht.
 - [x] Verbindungsabbrüche nach Neustart gefunden: der MikroTik behält die alte
       WLAN-Sitzung („reconnecting“). Abhilfe: die Tough meldet sich nach der
       ersten Verbindung jedes Starts einmal ab und wieder an
-- [ ] Issue für espOS: Neuanmeldung nach Neustart an MikroTik-Routern (Entwurf
-      zuerst für den Eigner)
+- [x] Issue für espOS: Neuanmeldung nach Neustart an MikroTik-Routern
+      ([signalk-espOS/espOS#289](https://github.com/signalk-espOS/espOS/issues/289));
+      der Workaround in `main/app_main.cpp` fällt weg, sobald espOS es löst
 
 **Fertig, wenn:** Der Designer findet das Gerät, und ein geschobenes Layout zeigt
 Live-Daten vom Halpi2.
@@ -274,6 +275,9 @@ eine Nacht lang am Halpi2 ohne Neustart.
 - [ ] `wind`-Widget (Firmware, Designer, WASM)
 - [ ] NMEA 0183 über den RS485-Anschluss (`espos_nmea0183`), falls RS485 später gebraucht wird
 - [ ] Uhrzeit aus der RTC BM8563
+- [ ] Eigene Nachthelligkeit `cockpit.brightness_night`, die gilt, solange
+      `environment.mode` auf `night` steht (die Hardware kann nicht dunkler
+      als die 5-%-Stufe, 2,5 V an LDO3)
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
 ## PRs an andere Projekte

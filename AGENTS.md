@@ -119,6 +119,12 @@ state there (raising the anchor, switches, acknowledging a notification). Say
 what will be sent and what it changes, then wait. Test with display-only
 widgets first.
 
+One standing exception: the HMI designer page on the boat server may be used
+read-only without asking: open it, connect it to the Tough, mirror the panel,
+take screenshots. Pushing or saving a layout, any state change, plugin or
+server settings and shell access still need approval first. Never sign in on
+the owner's behalf; ask them to.
+
 ## Never commit
 
 WiFi SSIDs or passwords, server IPs or hostnames, API keys, tokens, `*.pem`, or
