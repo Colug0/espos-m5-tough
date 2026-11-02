@@ -97,14 +97,16 @@ jobs:
   # the release-assets branch, where the browser flasher can read them. No
   # flash_tables: the Tough always has 16 MB, and partitions-16mb.csv (the
   # project's table, with the layout partition) is what the image is laid out
-  # for. Keep the pin on the same espOS release as the espos submodule;
-  # Dependabot moves it, track-espos.yml moves the submodule.
+  # for. Pinned by commit like every other action here, because this
+  # workflow receives the signing key; the comment names the release.
+  # Keep it on the same espOS release as the espos submodule: Dependabot
+  # moves the pin, track-espos.yml moves the submodule.
   firmware:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: write
-    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@v0.26.0
+    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@04e2c458441440747276328ea7df5e2aa8e451c3 # v0.26.0
     with:
       name: m5-tough
       builds: '[{"target": "esp32"}]'
