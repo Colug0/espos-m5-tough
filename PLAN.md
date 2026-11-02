@@ -190,15 +190,17 @@ Ton-Regeln pro Pfad sind zurückgestellt.
 - [x] Schlüssel als Secret `SIGNING_KEY_PEM` abgelegt (2459 Byte). Der erste
       signierte Release-Build muss ihn bestätigen: `espsecure signature-info-v2`
       auf dem Image muss `7bcd3eec7a8b2f68` zeigen
-- [ ] Branch-Schutz (Skill `oss-branch-protection`), sobald CI läuft
+- [x] Branch-Schutz für `main`: nur per PR, Checks `firmware (esp32)` und
+      `title is a Conventional Commit` Pflicht, lineare Historie, kein Force-Push
 - [x] WSL2: Systempakete, ESP-IDF v6.0.3 (`install.sh esp32`), `usbipd-win`
 - [x] Skills `espos-firmware` und `espos-dev` installiert
-- [ ] Skills aus `sailingnaturali` installieren (`coderabbit-cli`, `oss-branch-protection`)
+- [x] Skill `coderabbit-cli` installiert; die `cr`-CLI selbst fehlt noch, Reviews
+      laufen deshalb im PR
 
 `ci.yml` und `track-espos.yml` kommen mit Phase 1: Beide brauchen das
 espOS-Submodule und eine Firmware, die sich bauen lässt. Ohne sie wäre `main`
 von Anfang an rot.
-- [ ] Halpi2: HMI Designer und signalk-espos-manager installieren (macht der Eigner selbst oder nach Freigabe)
+- [x] Halpi2: HMI Designer und signalk-espos-manager installiert (`environment.mode` kommt an)
 
 ### Phase 1: Hardware-Bringup
 
@@ -214,7 +216,8 @@ von Anfang an rot.
 - [x] Auf dem Gerät geprüft: Bild, Farben, Helligkeit, Ton
 - [x] Touch-Koordinaten geprüft: Ecken 1,1 und 319,239, keine Kalibrierung nötig
 - [x] WLAN über das Setup-Portal, Signal K-Zugriff am Halpi2 freigegeben, Stream verbunden
-- [ ] Lautstärke an Bord bewerten (1-W-Lautsprecher)
+- [x] Lautstärke an Bord bewertet: der Cockpit-Ton war zu leise, jetzt 2,4 kHz bei
+      vollem Pegel (#5)
 - [x] Speichertabelle pro Startphase eingetragen
 - [x] Speicher mit WLAN, Signal K-Stream und Freigabe gemessen (74 KB frei, Tiefstwert 55 KB)
 - [ ] ILI9342C/E auf dem Bus erkennen statt per Kconfig wählen
@@ -252,11 +255,15 @@ Live-Daten vom Halpi2.
 
 ### Phase 3: Die Use Cases
 
-- [ ] `anchor`, `anchor_track`, `@drop_here`
-- [ ] `notifications`-Liste, Alarm-Overlay für 320×240, Chime, `@audio_mute`
-- [ ] `@brightness` über AXP192 LDO3 (manuell), Idle-Dimmer und Nachtdimmung über
-      `environment.mode` (automatisch; der Wert kommt vom signalk-espos-manager)
-- [ ] `/screenshot` (erst BMP, dann JPEG) für den Mirror-Modus, `POST /screen`
+- [x] `anchor`, `anchor_track` zeigen Daten vom Halpi2
+- [ ] `@drop_here` (setzt den Anker am Halpi2 wirklich; zurückgestellt)
+- [x] `notifications`-Liste, Alarm-Overlay für 320×240, Chime: echte Test-Alarme
+      (Warnung, Alarm, Notfall) vom Halpi2 mit Ton und Quittieren (#5)
+- [ ] `@audio_mute` am Gerät prüfen
+- [x] `@brightness` über AXP192 LDO3 (manuell): 9 Stufen von 2,5 bis 3,3 V, die
+      5-%-Stufe reicht nachts
+- [ ] Idle-Dimmer und Nachtdimmung über `environment.mode` bei Nacht prüfen
+- [x] `/screenshot` (JPEG und BMP) für den Mirror-Modus, `POST /screen`
 
 **Fertig, wenn:** Ein Tough-Layout mit Anker, SoC, Wind und Notifications läuft
 eine Nacht lang am Halpi2 ohne Neustart.
@@ -265,7 +272,7 @@ eine Nacht lang am Halpi2 ohne Neustart.
 
 - [ ] release-please (`"initial-version": "0.1.0"`), espOS `release-firmware.yml`
       mit `flash_tables: "16mb"`
-- [ ] `espos_start_opts_t.board` fest auf `"M5Stack Tough"`
+- [x] `espos_start_opts_t.board` fest auf `"M5Stack Tough"`
 - [ ] Registry: `boards/m5stack-tough.json` und `projects/<id>.json`
 - [ ] OTA über signalk-espos-manager testen
 - [ ] README für Bootseigner (Hardware, 12-V-Anschluss, Flasher, Setup, Updates)
