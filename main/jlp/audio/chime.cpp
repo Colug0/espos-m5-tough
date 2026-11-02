@@ -40,6 +40,12 @@ struct Seg {
   uint16_t ms;
 };
 
+// The Tough's 1 W speaker is small: below about 1.5 kHz it gives little,
+// and the ear is most sensitive around 2-3 kHz, so the tones sit there.
+// Each tone is a sine pushed towards a square by tanh: more energy at the
+// same peak, still without the hard edges that would click.
+constexpr float kDrive = 3.0f;
+
 // Append a tone (or a rest, when hz==0) to `out` at `rate`, with a
 // short linear fade in/out so the speaker doesn't click on each edge.
 void append_seg(std::vector<int16_t>& out, uint32_t rate, const Seg& seg,
@@ -49,6 +55,7 @@ void append_seg(std::vector<int16_t>& out, uint32_t rate, const Seg& seg,
   size_t fade = n / 20;  // ~5% ramp on each end
   if (fade == 0) fade = 1;
   const float two_pi_f = 2.0f * (float)M_PI * seg.hz / (float)rate;
+  const float norm = 1.0f / tanhf(kDrive);
   size_t base = out.size();
   out.resize(base + n);
   for (size_t i = 0; i < n; ++i) {
@@ -57,31 +64,34 @@ void append_seg(std::vector<int16_t>& out, uint32_t rate, const Seg& seg,
       env = (float)i / (float)fade;
     else if (i >= n - fade)
       env = (float)(n - i) / (float)fade;
-    float s = (seg.hz > 0.0f) ? sinf(two_pi_f * (float)i) : 0.0f;
+    float s = (seg.hz > 0.0f) ? tanhf(kDrive * sinf(two_pi_f * (float)i)) * norm
+                              : 0.0f;
     out[base + i] = (int16_t)(s * env * amp * 32767.0f);
   }
 }
 
 // Severity -> tone pattern. Higher severity = more insistent (more
-// beeps, tighter spacing, higher pitch). Amplitudes stay below full
-// scale to leave the codec headroom and avoid amp clipping.
+// beeps, tighter spacing, higher pitch). The NS4168 has no gain setting,
+// so the level is set here: alarms at full scale, the lower states
+// quieter so they stay distinguishable.
 void pattern_for(NotState state, std::vector<Seg>& segs, float& amp) {
   switch (state) {
     case NotState::Emergency:
-      amp = 0.85f;
-      segs = {{1100, 90}, {0, 60}, {1100, 90}, {0, 60}, {1100, 90}};
+      amp = 1.0f;
+      segs = {{2600, 140}, {0, 70}, {2600, 140}, {0, 70},
+              {2600, 140}, {0, 70}, {2600, 140}};
       break;
     case NotState::Alarm:
-      amp = 0.80f;
-      segs = {{880, 150}, {0, 90}, {880, 150}};
+      amp = 1.0f;
+      segs = {{2400, 220}, {0, 110}, {2400, 220}, {0, 110}, {2400, 220}};
       break;
     case NotState::Warn:
-      amp = 0.65f;
-      segs = {{660, 220}};
+      amp = 0.8f;
+      segs = {{2000, 250}, {0, 120}, {2000, 250}};
       break;
     case NotState::Alert:
-      amp = 0.55f;
-      segs = {{540, 180}};
+      amp = 0.6f;
+      segs = {{1600, 250}};
       break;
     default:  // Nominal / Normal — silent
       break;
@@ -105,7 +115,7 @@ void Chime::play(NotState state, bool ignore_mute) {
 
   const uint32_t rate = audio_->sample_rate();
   std::vector<int16_t> pcm;
-  pcm.reserve(rate / 2);  // ~half a second worst case
+  pcm.reserve(rate);  // about a second worst case
   for (const Seg& seg : segs) append_seg(pcm, rate, seg, amp);
 
   ESP_LOGI(TAG, "chime %s (%u frames)", not_state_name(state),

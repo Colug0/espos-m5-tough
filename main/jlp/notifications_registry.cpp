@@ -153,8 +153,11 @@ void NotificationsRegistry::apply(const std::string& path_after_prefix,
   // different, quieter alert could be more severe and suppress the beep).
   last_escalation_wants_sound_ = last_change_was_escalation_ && n.wants_sound;
   map_[path_after_prefix] = n;
-  ESP_LOGI(TAG, "%s = %s \"%s\"%s", path_after_prefix.c_str(),
+  // Whether the source asked for sound decides the chime, and is otherwise
+  // invisible from outside the panel.
+  ESP_LOGI(TAG, "%s = %s \"%s\" %s%s", path_after_prefix.c_str(),
            not_state_name(n.state), n.message.c_str(),
+           n.wants_sound ? "sound" : "silent",
            last_change_was_escalation_ ? " (escalation)" : "");
   last_changed_path_ = path_after_prefix;
   fire_observers();
