@@ -19,6 +19,12 @@ namespace jlp {
  *  Fail-safe behaviour: until SK has delivered a value, classify as
  *  Day so the helm stays bright. Dimming while the operator needs the
  *  display is far worse than not saving power before the first delta.
+ *
+ *  A Signal K outage keeps the last mode: a short drop at night must not
+ *  light the cabin. A long one cannot hold the night brightness past
+ *  sunrise either, because espOS restarts the device (skLinkStalled after
+ *  sk.stall_s, 5 min, with WiFi up; wifiStalled after 30 min without
+ *  WiFi), and a restart starts at Unknown again.
  */
 enum class DayNight : uint8_t { Unknown, Day, Night };
 
@@ -40,10 +46,6 @@ class SunState {
    *  (case-insensitive); anything else leaves the state unchanged. */
   void set_mode(const char* mode);
 
-  /** Back to Unknown, so the fail-safe day brightness applies. For a
-   *  Signal K outage long enough that sunrise or sunset may have passed;
-   *  the next environment.mode delta sets it again. */
-  void forget();
 
  private:
   // Written on the Signal K stream task, read from the UI task.

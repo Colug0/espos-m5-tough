@@ -34,12 +34,6 @@ void SunState::set_mode(const char* mode) {
   ESP_LOGI(TAG, "mode=%s", mode);
 }
 
-void SunState::forget() {
-  if (state_ == DayNight::Unknown) return;
-  state_ = DayNight::Unknown;
-  ESP_LOGI(TAG, "mode unknown (Signal K gone too long)");
-}
-
 namespace {
 void on_mode(const espos_sk_update_t* u, void*) {
   if (!u->value_json) return;

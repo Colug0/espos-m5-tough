@@ -65,14 +65,6 @@ tough_hal::ToughAudio s_audio;
 std::atomic<bool> s_panel_up{false};
 bool s_boot_fetch_done = false;
 bool s_sk_connected = false;
-// Bumped on every stream up and down, so a pending "forget day/night"
-// from an earlier outage does nothing once the stream is back.
-uint32_t s_sk_link_gen = 0;
-// How long a Signal K outage may last before the panel stops trusting the
-// last day/night it heard and falls back to the day brightness. Short
-// drops at night then leave the cabin dark; a long one across sunrise
-// does not keep the panel dimmed all morning.
-constexpr uint32_t kForgetModeMs = 30 * 60 * 1000;
 
 // Internal byte-addressable RAM is the pool that runs out on this chip
 // (espos-memory-budget): count it, its largest block and its low-water mark
@@ -89,7 +81,6 @@ void log_heap(const char* stage) {
 // All on the UI task.
 void sk_stream_up() {
   s_sk_connected = true;
-  ++s_sk_link_gen;
   jlp::overlay().set_sk("ok");
   jlp::overlay().hide_sk_lost();
   espos_sk_server_t srv;
@@ -109,10 +100,6 @@ void sk_stream_up() {
 void sk_stream_down() {
   s_sk_connected = false;
   jlp::notifications().forget_all_self_clears();
-  const uint32_t gen = ++s_sk_link_gen;
-  ui::after(kForgetModeMs, [gen] {
-    if (gen == s_sk_link_gen && !s_sk_connected) jlp::sun_state().forget();
-  });
   jlp::overlay().set_sk("down");
   jlp::overlay().show_sk_lost();
 }
