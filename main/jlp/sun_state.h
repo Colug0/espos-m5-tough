@@ -40,6 +40,11 @@ class SunState {
    *  (case-insensitive); anything else leaves the state unchanged. */
   void set_mode(const char* mode);
 
+  /** Back to Unknown, so the fail-safe day brightness applies. For a
+   *  Signal K outage long enough that sunrise or sunset may have passed;
+   *  the next environment.mode delta sets it again. */
+  void forget();
+
  private:
   // Written on the Signal K stream task, read from the UI task.
   std::atomic<DayNight> state_{DayNight::Unknown};
