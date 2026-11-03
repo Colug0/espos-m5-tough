@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 (2026-11-03)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Added
+* feat(display): add a night brightness by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/15
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.1.1...v0.2.0
+
 ## 0.1.1 (2026-11-03)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
