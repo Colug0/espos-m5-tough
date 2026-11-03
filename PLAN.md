@@ -256,7 +256,8 @@ Live-Daten vom Halpi2.
 ### Phase 3: Die Use Cases
 
 - [x] `anchor`, `anchor_track` zeigen Daten vom Halpi2
-- [ ] `@drop_here` (setzt den Anker am Halpi2 wirklich; zurückgestellt)
+- [x] `@drop_here` am 3. November 2026 mit Freigabe getestet (PUT 200, das
+      Anker-Plugin übernimmt den Punkt; die Wache danach in der Anker-App neu setzen)
 - [x] `notifications`-Liste, Alarm-Overlay für 320×240, Chime: echte Test-Alarme
       (Warnung, Alarm, Notfall) vom Halpi2 mit Ton und Quittieren (#5)
 - [x] `@audio_mute` am Gerät geprüft: Overlay ja, Ton nein
@@ -288,9 +289,15 @@ eine Nacht lang am Halpi2 ohne Neustart.
 - [ ] `wind`-Widget (Firmware, Designer, WASM)
 - [ ] NMEA 0183 über den RS485-Anschluss (`espos_nmea0183`), falls RS485 später gebraucht wird
 - [ ] Uhrzeit aus der RTC BM8563
-- [ ] Eigene Nachthelligkeit `cockpit.brightness_night`, die gilt, solange
-      `environment.mode` auf `night` steht (die Hardware kann nicht dunkler
-      als die 5-%-Stufe, 2,5 V an LDO3)
+- [x] Eigene Nachthelligkeit `cockpit.night_bright` (0 = aus), die gilt, solange
+      `environment.mode` auf `night` steht; der `@brightness`-Slider verstellt die
+      gerade aktive, Alarme bleiben gedimmt (die Hardware kann nicht dunkler als
+      die 5-%-Stufe, 2,5 V an LDO3)
+- [ ] Notifications je Stufe einstellen: anzeigen und Ton getrennt (Firmware,
+      Designer, `JLP-PROTOCOL.md`)
+- [ ] Status- und Tab-Leiste nach einer Zeit ausblenden, Tippen blendet ein;
+      vorher mit Dirk das Layout-Modell klären (Widgets für 320×240 oder nur
+      für die Fläche zwischen den Leisten)
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
 ## PRs an andere Projekte

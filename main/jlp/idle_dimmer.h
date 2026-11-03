@@ -32,12 +32,20 @@ class IdleDimmer {
   // notification deltas and layout pushes.
   void wake();
 
-  // The brightness used while awake. Follows the `cockpit.brightness`
-  // setting: without this the dimmer would restore its own hardcoded
-  // default on the next wake and undo a brightness the user just set.
-  // Applies immediately when the panel is currently on.
-  void set_on_brightness(uint8_t pct);
-  uint8_t on_brightness() const { return on_brightness_pct_; }
+  // The brightness used while awake by day and by night. Follow the
+  // `cockpit.brightness` and `cockpit.night_bright` settings: without
+  // them the dimmer would restore its own default on the next wake and undo
+  // a brightness the user just set. 0 for night means "same as day". Apply
+  // at once when the panel is on.
+  void set_day_brightness(uint8_t pct);
+  void set_night_brightness(uint8_t pct);
+
+  // True while the night brightness is in force: one is set and Signal K
+  // reports night. Unknown or day keeps the day brightness.
+  bool night_active() const;
+
+  // The brightness that applies now, day or night.
+  uint8_t on_brightness() const;
 
   bool is_on() const { return on_; }
   uint32_t idle_timeout_sec() const { return idle_timeout_sec_; }
@@ -45,9 +53,16 @@ class IdleDimmer {
 
  private:
   void set_on(bool on);
+  // Puts on_brightness() on the backlight (when awake) and on the panel's
+  // "@brightness" slider whenever it changed: a new setting, or a switch
+  // between day and night.
+  void refresh();
 
   uint32_t idle_timeout_sec_ = 0;   // 0 = disabled
-  uint8_t on_brightness_pct_ = 95;  // overwritten from config at boot
+  uint8_t day_pct_ = 95;   // overwritten from config at boot
+  uint8_t night_pct_ = 0;  // 0 = no night brightness
+  // Last level refresh() published; 0xFF so the first one always applies.
+  uint8_t shown_pct_ = 0xFF;
   // 0 = fully off by default. Once the wake overlay covers the layout
   // the user can't accidentally trigger anything underneath, and the
   // GT911 still detects the first tap fine through the dark panel

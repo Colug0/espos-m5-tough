@@ -241,30 +241,38 @@ esp_err_t board_up(void*) {
   s_audio.init();
   log_heap("audio");
 
-  int32_t pct = 60;
-  espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &pct);
-  const auto brightness = static_cast<uint8_t>(pct);
-  // A brightness change from the web UI or the designer becomes the level the
-  // idle dimmer restores on wake; the brightness slider applies it itself.
+  int32_t day = 60;
+  int32_t night = 0;
+  espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &day);
+  espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_NIGHT_BRIGHT, &night);
+  // A brightness change from the web UI, the designer or the panel's slider
+  // goes to the idle dimmer, which decides between day and night and puts
+  // the level that applies on the backlight.
   espos_config_subscribe(
       [](const char* ns, const char* key, void*) {
         if (strcmp(ns, ESPOS_CFG_NS_COCKPIT) != 0) return;
-        if (strcmp(key, ESPOS_CFG_COCKPIT_BRIGHTNESS) != 0) return;
-        int32_t v = 60;
-        espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &v);
+        const bool is_day = strcmp(key, ESPOS_CFG_COCKPIT_BRIGHTNESS) == 0;
+        if (!is_day && strcmp(key, ESPOS_CFG_COCKPIT_NIGHT_BRIGHT) != 0) return;
+        int32_t v = 0;
+        espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, key, &v);
         const auto b = static_cast<uint8_t>(v);
-        ui::post([b] {
-          s_display.set_brightness(b);
-          jlp::idle_dimmer().set_on_brightness(b);
+        ui::post([is_day, b] {
+          if (is_day) {
+            jlp::idle_dimmer().set_day_brightness(b);
+          } else {
+            jlp::idle_dimmer().set_night_brightness(b);
+          }
         });
       },
       nullptr);
 
   ui::post(player_up);
   // Light the backlight once the first frame is drawn, not on a blank panel.
-  ui::after(150, [brightness] {
-    s_display.set_brightness(brightness);
-    jlp::idle_dimmer().set_on_brightness(brightness);
+  ui::after(150, [day, night] {
+    // Day first: setting night first would light the panel at the
+    // dimmer's built-in day default for a moment.
+    jlp::idle_dimmer().set_day_brightness(static_cast<uint8_t>(day));
+    jlp::idle_dimmer().set_night_brightness(static_cast<uint8_t>(night));
   });
   s_panel_up = true;
   return ESP_OK;

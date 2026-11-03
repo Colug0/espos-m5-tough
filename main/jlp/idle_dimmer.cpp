@@ -8,6 +8,7 @@
 #include "lvgl.h"
 
 #include "tough_hal/ui.h"
+#include "subject_registry.h"
 #include "sun_state.h"
 #include "wake_overlay.h"
 
@@ -24,7 +25,8 @@ void IdleDimmer::set_on(bool on) {
     // Hide the wake overlay BEFORE raising the backlight so the user
     // doesn't see the layout content flash up under the overlay.
     wake_overlay().hide();
-    d->set_brightness(on_brightness_pct_);
+    shown_pct_ = on_brightness();
+    d->set_brightness(shown_pct_);
   } else {
     // Show the "tap to wake" overlay BEFORE killing the backlight so
     // the panel doesn't briefly show the layout before going dark,
@@ -34,23 +36,51 @@ void IdleDimmer::set_on(bool on) {
     d->set_brightness(dim_pct_);
   }
   ESP_LOGI(TAG, "backlight %s (pct=%u)", on ? "on" : "off",
-           (unsigned)(on ? on_brightness_pct_ : dim_pct_));
+           (unsigned)(on ? on_brightness() : dim_pct_));
 }
 
-void IdleDimmer::set_on_brightness(uint8_t pct) {
-  on_brightness_pct_ = pct;
-  // Only touch the hardware if the panel is awake; while dimmed the dim
-  // level is what belongs on screen, and the new value takes effect on the
-  // next wake.
-  if (!on_) return;
-  auto* d = tough_hal::ui::display();
-  if (d) d->set_brightness(pct);
+bool IdleDimmer::night_active() const {
+  return night_pct_ > 0 && sun_state().classify() == DayNight::Night;
+}
+
+uint8_t IdleDimmer::on_brightness() const {
+  return night_active() ? night_pct_ : day_pct_;
+}
+
+void IdleDimmer::set_day_brightness(uint8_t pct) {
+  day_pct_ = pct;
+  refresh();
+}
+
+void IdleDimmer::set_night_brightness(uint8_t pct) {
+  night_pct_ = pct;
+  refresh();
+}
+
+void IdleDimmer::refresh() {
+  const uint8_t level = on_brightness();
+  if (level == shown_pct_) return;
+  shown_pct_ = level;
+  // While dimmed the dim level is what belongs on screen; the new level
+  // takes effect on the next wake.
+  if (on_) {
+    if (auto* d = tough_hal::ui::display()) d->set_brightness(level);
+  }
+  // The slider shows the level that applies now, so dragging it at night
+  // adjusts the night brightness.
+  if (lv_subject_t* s = registry().lookup("@brightness")) {
+    lv_subject_set_float(s, (float)level);
+  }
+  ESP_LOGI(TAG, "brightness %u%% (%s)", (unsigned)level,
+           night_active() ? "night" : "day");
 }
 
 void IdleDimmer::init() {
   // LVGL tracks input inactivity automatically. Poll on a 1 Hz cadence
   // — finer resolution is wasteful for human-scale timeouts.
   tough_hal::ui::every(1000, [this]() {
+    // Day and night switch here too, within a second of environment.mode.
+    refresh();
     if (idle_timeout_sec_ == 0) {
       if (!on_) set_on(true);
       return;

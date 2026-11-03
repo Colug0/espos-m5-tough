@@ -36,6 +36,7 @@ namespace ui = tough_hal::ui;
 #if JLP_STREAM
 #include "../net/stream_client.h"
 #endif
+#include "../idle_dimmer.h"
 #include "../notifications_registry.h"
 #include "../subject_registry.h"
 #include "../zone_registry.h"
@@ -749,26 +750,13 @@ struct BrightnessCtx {
   bool dragging;
 };
 
+// The level that applies now, day or night. The idle dimmer owns it and
+// feeds the "@brightness" subject whenever it changes, including a write
+// from the designer or the config API, so the knob never shows a stale
+// level.
 int32_t brightness_setting() {
-  int32_t pct = 95;
-  espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &pct);
+  const int32_t pct = idle_dimmer().on_brightness();
   return std::max(kBrightnessMin, std::min(kBrightnessMax, pct));
-}
-
-// Follows cockpit.brightness written elsewhere (the designer, the config
-// API) so an on-panel slider never shows a stale level. One subscription
-// per process; it feeds whichever "@brightness" subject the current
-// layout has, and nothing when the layout has none. Config callbacks run
-// on the writer's task, so the LVGL side is posted to the ui thread.
-void on_brightness_setting_changed(const char* ns, const char* key, void*) {
-  if (strcmp(ns, ESPOS_CFG_NS_COCKPIT) != 0) return;
-  if (strcmp(key, ESPOS_CFG_COCKPIT_BRIGHTNESS) != 0) return;
-  const int32_t pct = brightness_setting();
-  ui::post([pct] {
-    if (lv_subject_t* s = registry().lookup(kBrightnessBind)) {
-      lv_subject_set_float(s, (float)pct);
-    }
-  });
 }
 
 lv_obj_t* build_brightness_slider(BuildCtx& ctx, JsonObjectConst spec,
@@ -808,14 +796,6 @@ lv_obj_t* build_brightness_slider(BuildCtx& ctx, JsonObjectConst spec,
                             LV_ANIM_OFF);
       },
       sld, nullptr);
-  // Subscribe before the snapshot: the callback reports later commits
-  // only, so a write landing between the two would otherwise go unseen
-  // until the next one.
-  static bool subscribed = false;
-  if (!subscribed) {
-    subscribed = true;
-    espos_config_subscribe(on_brightness_setting_changed, nullptr);
-  }
   lv_subject_set_float(sub, (float)brightness_setting());
 
   // Preview while dragging: the operator sees the level they are choosing
@@ -835,12 +815,16 @@ lv_obj_t* build_brightness_slider(BuildCtx& ctx, JsonObjectConst spec,
         static_cast<BrightnessCtx*>(lv_obj_get_user_data(w))->dragging = true;
       },
       LV_EVENT_PRESSING, nullptr);
-  // Persist on release. Unchanged values fire no callback, and the
-  // backlight is already where the preview left it.
+  // Persist on release, into the setting that applies now: at night (with
+  // a night brightness set) the night one. Unchanged values fire no
+  // callback, and the backlight is already where the preview left it.
   auto commit_brightness_cb = [](lv_event_t* e) {
     auto* w = static_cast<lv_obj_t*>(lv_event_get_target(e));
     static_cast<BrightnessCtx*>(lv_obj_get_user_data(w))->dragging = false;
-    espos_config_set_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS,
+    espos_config_set_i32(ESPOS_CFG_NS_COCKPIT,
+                         idle_dimmer().night_active()
+                             ? ESPOS_CFG_COCKPIT_NIGHT_BRIGHT
+                             : ESPOS_CFG_COCKPIT_BRIGHTNESS,
                          lv_slider_get_value(w));
   };
   lv_obj_add_event_cb(sld, commit_brightness_cb, LV_EVENT_RELEASED, nullptr);
