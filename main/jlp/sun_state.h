@@ -21,10 +21,10 @@ namespace jlp {
  *  display is far worse than not saving power before the first delta.
  *
  *  A Signal K outage keeps the last mode: a short drop at night must not
- *  light the cabin. A long one cannot hold the night brightness past
- *  sunrise either, because espOS restarts the device (skLinkStalled after
+ *  light the cabin. So an outage across sunrise keeps the night brightness
+ *  until it ends or until espOS restarts the device (skLinkStalled after
  *  sk.stall_s, 5 min, with WiFi up; wifiStalled after 30 min without
- *  WiFi), and a restart starts at Unknown again.
+ *  WiFi); a restart starts at Unknown, and Unknown is day.
  */
 enum class DayNight : uint8_t { Unknown, Day, Night };
 
