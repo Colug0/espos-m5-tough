@@ -293,8 +293,10 @@ eine Nacht lang am Halpi2 ohne Neustart.
       `environment.mode` auf `night` steht; der `@brightness`-Slider verstellt die
       gerade aktive, Alarme bleiben gedimmt (die Hardware kann nicht dunkler als
       die 5-%-Stufe, 2,5 V an LDO3)
-- [ ] Notifications je Stufe einstellen: anzeigen und Ton getrennt (Firmware,
-      Designer, `JLP-PROTOCOL.md`)
+- [x] Notifications je Stufe in der Firmware: `notifications.levels.<stufe>` mit
+      `show`, `sound` (aus / wie Quelle / immer) und `repeat_s`
+- [ ] Notifications je Stufe im Designer (PR an signalk-espos-hmi-designer, bis
+      dahin lokaler Build auf dem Halpi2) und in `JLP-PROTOCOL.md` und im Cockpit
 - [ ] Status- und Tab-Leiste nach einer Zeit ausblenden, Tippen blendet ein;
       vorher mit Dirk das Layout-Modell klären (Widgets für 320×240 oder nur
       für die Fläche zwischen den Leisten)
