@@ -123,6 +123,12 @@ class NotificationsRegistry {
    *  out but never echoed back. UI task only, like acknowledge(). */
   void forget_self_clear(const std::string& path_after_prefix);
 
+  /** Drops every echo mark. Called when the Signal K stream goes down:
+   *  espos_sk_send_raw() reports success once an ACK is queued, and a
+   *  disconnect discards what is still queued, so no echo will come for
+   *  those. Better a re-shown alarm than one a real clear left silenced. */
+  void forget_all_self_clears() { self_cleared_.clear(); }
+
   /** True if `path` is currently acknowledged. */
   bool is_acknowledged(const std::string& path_after_prefix) const;
 
