@@ -99,6 +99,7 @@ void sk_stream_up() {
 
 void sk_stream_down() {
   s_sk_connected = false;
+  jlp::notifications().forget_all_self_clears();
   jlp::overlay().set_sk("down");
   jlp::overlay().show_sk_lost();
 }
