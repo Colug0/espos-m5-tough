@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1 (2026-11-03)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(jlp): ack send result, seed order, wait comment by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/13
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.1.0...v0.1.1
+
 ## 0.1.0 (2026-11-02)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
