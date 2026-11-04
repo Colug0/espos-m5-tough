@@ -32,6 +32,7 @@ so in its header. What changed for the M5Stack Tough:
 | `zones: []` removes a path's zones instead of keeping the old ones | `zone_registry.cpp` |
 | The notification log line says whether the source asked for sound (`sound`/`silent`) | `notifications_registry.cpp` |
 | Chime tones at 1.6-2.6 kHz, shaped towards a square, alarms at full scale and longer, for the Tough's small speaker | `audio/chime.cpp` |
+| Per-level notifications: optional `notifications.levels.<state>` with `show`, `sound` (`off`/`source`/`always`) and `repeat_s`; without it `min_state` applies as before. Only shown or sounding levels wake the panel (an addition to JLP-PROTOCOL.md) | `alert_overlay.*`, `layout/layout_manager.cpp`, `notifications_registry.*`, `app_main.cpp` |
 | Night brightness: `cockpit.night_bright` applies while `environment.mode` is night; the idle dimmer feeds the `@brightness` slider, which then adjusts the brightness in force | `idle_dimmer.*`, `widgets/widget_factory.cpp` |
 | The ACK echo guard expires after 10 s, so an ACK that was never sent cannot hide the real clear | `notifications_registry.*` |
 | `SunState` keeps its state in a `std::atomic` (stream task writes, UI task reads) | `sun_state.*` |
