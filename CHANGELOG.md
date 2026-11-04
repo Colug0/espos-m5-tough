@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 (2026-11-04)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Added
+* feat(jlp): show the status strip on swipe by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/19
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.3.0...v0.4.0
+
 ## 0.3.0 (2026-11-04)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
