@@ -224,7 +224,9 @@ bool AlertOverlay::sounds(const Notification& n) const {
 
 bool AlertOverlay::wants_attention(const Notification& n) const {
   const LevelPolicy* p = policy(n.state);
-  return enabled_ && p && (p->show || sounds(n));
+  // A hidden level that would only chime has nothing to offer a muted
+  // panel: waking it would light an empty screen.
+  return enabled_ && p != nullptr && (p->show || (sounds(n) && !chime().muted()));
 }
 
 void AlertOverlay::play(const Notification& n) {
@@ -242,17 +244,27 @@ void AlertOverlay::repeat_tick() {
                          !notifications().is_acknowledged(it->first);
     it = pending ? std::next(it) : last_chime_.erase(it);
   }
-  // One repeat at a time: the most severe pending notification that
-  // repeats. Clips from several at once would only queue up.
+  // One repeat at a time, since clips from several at once would only
+  // queue up: the due one that is most overdue, the most severe on a tie.
+  // Picking by severity alone would let a pending emergency with a short
+  // interval starve every other level's repeat.
   const Notification* best = nullptr;
+  uint32_t best_overdue = 0;
   for (const auto& kv : last_chime_) {
     const Notification* n = notifications().find(kv.first);
-    const LevelPolicy* p = n ? policy(n->state) : nullptr;
-    if (!p || p->repeat_s == 0 || !sounds(*n)) continue;
-    if (lv_tick_elaps(kv.second) < p->repeat_s * 1000u) continue;
-    if (!best || n->state > best->state) best = n;
+    const LevelPolicy* p = n != nullptr ? policy(n->state) : nullptr;
+    if (p == nullptr || p->repeat_s == 0 || !sounds(*n)) continue;
+    const uint32_t elapsed = lv_tick_elaps(kv.second);
+    const uint32_t interval = p->repeat_s * 1000u;
+    if (elapsed < interval) continue;
+    const uint32_t overdue = elapsed - interval;
+    if (best == nullptr || overdue > best_overdue ||
+        (overdue == best_overdue && n->state > best->state)) {
+      best = n;
+      best_overdue = overdue;
+    }
   }
-  if (best) play(*best);
+  if (best != nullptr) play(*best);
 }
 
 void AlertOverlay::rebuild() {
