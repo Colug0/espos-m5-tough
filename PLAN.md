@@ -297,9 +297,12 @@ eine Nacht lang am Halpi2 ohne Neustart.
       `show`, `sound` (aus / wie Quelle / immer) und `repeat_s`
 - [ ] Notifications je Stufe im Designer (PR an signalk-espos-hmi-designer, bis
       dahin lokaler Build auf dem Halpi2) und in `JLP-PROTOCOL.md` und im Cockpit
-- [ ] Status- und Tab-Leiste nach einer Zeit ausblenden, Tippen blendet ein;
-      vorher mit Dirk das Layout-Modell klären (Widgets für 320×240 oder nur
-      für die Fläche zwischen den Leisten)
+- [x] Statusleiste bei Bedarf: ein Layout mit `status_overlay: false` nutzt die
+      vollen 240 px, Wischen vom oberen Rand blendet die Leiste für
+      `cockpit.status_peek_s` (Vorgabe 5 s) über den Widgets ein, ohne Signal K
+      steht sie dauerhaft
+- [ ] Tab-Leiste als Einblendung, damit die Widgets auch die 56 px bekommen;
+      braucht ein Layout-Feld und den Designer, vorher mit Dirk klären
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
 ## PRs an andere Projekte

@@ -45,7 +45,21 @@ class StatusOverlay {
   void set_visible(bool visible);
   bool is_visible() const { return visible_; }
 
+  // While a layout hides the strip, a swipe down from the top edge shows
+  // it above the content for this long; any touch while it shows starts
+  // the time again, a tap on it closes it.
+  void set_peek_seconds(uint32_t seconds);
+
+  // While the Signal K stream is down (no network counts), the strip
+  // shows above the content even when the layout hides it: the operator
+  // sees why values stopped.
+  void set_fault(bool fault);
+
  private:
+  void on_press();
+  void track_swipe();
+  void update_float();
+
   lv_obj_t* strip_ = nullptr;
   lv_obj_t* content_root_ = nullptr;
   lv_obj_t* lbl_host_ = nullptr;
@@ -57,6 +71,13 @@ class StatusOverlay {
   lv_obj_t* sk_lost_lbl_ = nullptr;   // its text
   char sk_server_[40] = "";           // "host:port" for the banner text
   bool visible_ = true;
+  bool fault_ = true;           // no Signal K stream until the first connect
+  bool peeking_ = false;
+  uint32_t peek_ms_ = 5000;
+  uint32_t peek_start_ = 0;     // lv_tick of the swipe or the last touch
+  lv_indev_t* indev_ = nullptr;
+  lv_point_t press_{};          // where the current press started
+  uint32_t swipe_timer_ = 0;    // ui::every handle while a swipe is tracked
 };
 
 StatusOverlay& overlay();

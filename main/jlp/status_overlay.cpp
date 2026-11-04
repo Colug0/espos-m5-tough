@@ -6,10 +6,17 @@
 
 #include <cstdio>
 
+#include "tough_hal/ui.h"
+
 namespace jlp {
 
 namespace {
 constexpr int kStripHeight = 28;
+// A swipe starts this close to the top edge and travels this far down,
+// more down than sideways. The band is a little wider than the strip:
+// a finger coming off the bezel lands a few pixels in.
+constexpr int32_t kEdgeBand = 24;
+constexpr int32_t kSwipeMin = 30;
 constexpr uint32_t kBgHex = 0x161b22;
 constexpr uint32_t kFgHex = 0xe6edf3;
 constexpr uint32_t kMutedHex = 0x8b949e;
@@ -27,6 +34,18 @@ void StatusOverlay::init() {
   lv_obj_t* scr = lv_screen_active();
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x0d1117), LV_PART_MAIN);
   lv_obj_set_style_pad_all(scr, 0, LV_PART_MAIN);
+
+  // The rest of the screen, where layouts live. Created before the strip
+  // so the strip paints above it when it floats over a full-height layout.
+  content_root_ = lv_obj_create(scr);
+  lv_obj_set_size(content_root_, LV_HOR_RES, LV_VER_RES - kStripHeight);
+  lv_obj_align(content_root_, LV_ALIGN_TOP_MID, 0, kStripHeight);
+  lv_obj_set_style_bg_color(content_root_, lv_color_hex(0x0d1117),
+                            LV_PART_MAIN);
+  lv_obj_set_style_border_width(content_root_, 0, LV_PART_MAIN);
+  lv_obj_set_style_radius(content_root_, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(content_root_, 0, LV_PART_MAIN);
+  lv_obj_set_scrollable(content_root_, false);
 
   strip_ = lv_obj_create(scr);
   lv_obj_set_size(strip_, LV_HOR_RES, kStripHeight);
@@ -51,16 +70,29 @@ void StatusOverlay::init() {
     lbl_sys_ = make_label(strip_, "up 0s heap ?");
   }
 
-  // The rest of the screen — future layouts live here.
-  content_root_ = lv_obj_create(scr);
-  lv_obj_set_size(content_root_, LV_HOR_RES, LV_VER_RES - kStripHeight);
-  lv_obj_align(content_root_, LV_ALIGN_TOP_MID, 0, kStripHeight);
-  lv_obj_set_style_bg_color(content_root_, lv_color_hex(0x0d1117),
-                            LV_PART_MAIN);
-  lv_obj_set_style_border_width(content_root_, 0, LV_PART_MAIN);
-  lv_obj_set_style_radius(content_root_, 0, LV_PART_MAIN);
-  lv_obj_set_style_pad_all(content_root_, 0, LV_PART_MAIN);
-  lv_obj_set_scrollable(content_root_, false);
+  // A tap on a floating strip closes it; a pinned one ignores taps.
+  lv_obj_set_clickable(strip_, true);
+  lv_obj_add_event_cb(
+      strip_,
+      [](lv_event_t* e) {
+        auto* self = static_cast<StatusOverlay*>(lv_event_get_user_data(e));
+        self->peeking_ = false;
+        self->update_float();
+      },
+      LV_EVENT_CLICKED, this);
+
+  // Presses are watched on the input device, not on an object: the swipe
+  // may start on any widget of the layout.
+  indev_ = lv_indev_get_next(nullptr);
+  if (indev_ != nullptr) {
+    lv_indev_add_event_cb(
+        indev_,
+        [](lv_event_t* e) {
+          static_cast<StatusOverlay*>(lv_event_get_user_data(e))->on_press();
+        },
+        LV_EVENT_PRESSED, this);
+  }
+  tough_hal::ui::every(250, [this]() { update_float(); });
 
   // Connection-lost banner: a full-width red bar pinned to the bottom,
   // parented to the SCREEN (not the strip) so it shows even when a
@@ -144,16 +176,65 @@ void StatusOverlay::set_uptime_heap(uint32_t uptime_s, uint32_t free_heap) {
 void StatusOverlay::set_visible(bool visible) {
   if (visible == visible_) return;
   visible_ = visible;
+  peeking_ = false;
   if (!strip_ || !content_root_) return;
   if (visible) {
     lv_obj_set_hidden(strip_, false);
     lv_obj_set_size(content_root_, LV_HOR_RES, LV_VER_RES - kStripHeight);
     lv_obj_align(content_root_, LV_ALIGN_TOP_MID, 0, kStripHeight);
   } else {
-    lv_obj_set_hidden(strip_, true);
     lv_obj_set_size(content_root_, LV_HOR_RES, LV_VER_RES);
     lv_obj_align(content_root_, LV_ALIGN_TOP_MID, 0, 0);
+    update_float();
   }
+}
+
+void StatusOverlay::set_peek_seconds(uint32_t seconds) {
+  peek_ms_ = seconds * 1000u;
+}
+
+void StatusOverlay::set_fault(bool fault) {
+  fault_ = fault;
+  update_float();
+}
+
+void StatusOverlay::on_press() {
+  if (peeking_) peek_start_ = lv_tick_get();  // still reading it
+  if (visible_ || swipe_timer_ != 0 || indev_ == nullptr) return;
+  lv_indev_get_point(indev_, &press_);
+  if (press_.y >= kEdgeBand) return;
+  // PRESSING reaches objects only, so the movement is sampled here.
+  swipe_timer_ = tough_hal::ui::every(20, [this]() { track_swipe(); });
+}
+
+void StatusOverlay::track_swipe() {
+  bool done = lv_indev_get_state(indev_) != LV_INDEV_STATE_PRESSED;
+  if (!done) {
+    lv_point_t p{};
+    lv_indev_get_point(indev_, &p);
+    const int32_t dy = p.y - press_.y;
+    const int32_t dx = LV_ABS(p.x - press_.x);
+    if (dy >= kSwipeMin && dy > dx) {
+      // The widget under the finger gets PRESS_LOST instead of a click.
+      lv_indev_wait_release(indev_);
+      peeking_ = true;
+      peek_start_ = lv_tick_get();
+      update_float();
+      done = true;
+    }
+  }
+  if (done) {
+    tough_hal::ui::cancel(swipe_timer_);
+    swipe_timer_ = 0;
+  }
+}
+
+// Only for a strip the layout hides: show it above the content while a
+// peek lasts or the stream is down.
+void StatusOverlay::update_float() {
+  if (visible_ || strip_ == nullptr) return;
+  if (peeking_ && lv_tick_elaps(peek_start_) >= peek_ms_) peeking_ = false;
+  lv_obj_set_hidden(strip_, !(peeking_ || fault_));
 }
 
 StatusOverlay& overlay() {

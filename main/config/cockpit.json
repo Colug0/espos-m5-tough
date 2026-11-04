@@ -2,7 +2,7 @@
   "namespace": "cockpit",
   "version": 1,
   "title": "Display",
-  "description": "Display behaviour that is not part of a layout: day and night brightness and the layout push port. The namespace is \"cockpit\" because the espOS HMI Designer writes cockpit.brightness, as it does on espos-p4-cockpit.",
+  "description": "Display behaviour that is not part of a layout: day and night brightness, the status strip on swipe and the layout push port. The namespace is \"cockpit\" because the espOS HMI Designer writes cockpit.brightness, as it does on espos-p4-cockpit.",
   "keys": [
     {
       "name": "brightness",
@@ -22,6 +22,16 @@
       "unit": "%",
       "title": "Night brightness",
       "description": "Backlight while Signal K reports environment.mode night (signalk-espos-manager publishes it from the sun at the boat's position). 0 keeps the day brightness at night. Below 5 % is the same as 5 %, the dimmest step the backlight has."
+    },
+    {
+      "name": "status_peek_s",
+      "type": "int",
+      "default": 5,
+      "min": 1,
+      "max": 60,
+      "unit": "s",
+      "title": "Status strip on swipe",
+      "description": "For a layout that hides the status strip: a swipe down from the top edge shows it above the widgets for this long. Any touch while it shows starts the time again; a tap on it closes it. While Signal K is unreachable it stays up."
     },
     {
       "name": "api_port",

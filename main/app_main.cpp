@@ -83,6 +83,7 @@ void sk_stream_up() {
   s_sk_connected = true;
   jlp::overlay().set_sk("ok");
   jlp::overlay().hide_sk_lost();
+  jlp::overlay().set_fault(false);
   espos_sk_server_t srv;
   if (espos_sk_get_server(&srv) == ESP_OK) jlp::overlay().set_sk_server(srv.host, srv.port);
   // First connection after boot: seed zones and quiet values for the paths
@@ -102,6 +103,7 @@ void sk_stream_down() {
   jlp::notifications().forget_all_self_clears();
   jlp::overlay().set_sk("down");
   jlp::overlay().show_sk_lost();
+  jlp::overlay().set_fault(true);
 }
 
 void on_espos_event(void*, esp_event_base_t, int32_t id, void*) {
@@ -248,14 +250,23 @@ esp_err_t board_up(void*) {
 
   int32_t day = 60;
   int32_t night = 0;
+  int32_t peek_s = 5;
   espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &day);
   espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_NIGHT_BRIGHT, &night);
+  espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_STATUS_PEEK_S, &peek_s);
+  ui::post([peek_s] { jlp::overlay().set_peek_seconds(static_cast<uint32_t>(peek_s)); });
   // Config callbacks run on the writer's task (httpd, the slider's commit).
   // The idle dimmer drives the backlight and the @brightness subject, so the
   // change is posted to the UI task.
   espos_config_subscribe(
       [](const char* ns, const char* key, void*) {
         if (strcmp(ns, ESPOS_CFG_NS_COCKPIT) != 0) return;
+        if (strcmp(key, ESPOS_CFG_COCKPIT_STATUS_PEEK_S) == 0) {
+          int32_t s = 5;
+          espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, key, &s);
+          ui::post([s] { jlp::overlay().set_peek_seconds(static_cast<uint32_t>(s)); });
+          return;
+        }
         const bool is_day = strcmp(key, ESPOS_CFG_COCKPIT_BRIGHTNESS) == 0;
         if (!is_day && strcmp(key, ESPOS_CFG_COCKPIT_NIGHT_BRIGHT) != 0) return;
         int32_t v = 0;
