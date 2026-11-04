@@ -59,6 +59,7 @@ class AlertOverlay {
   bool sounds(const Notification& n) const;
   void play(const Notification& n);
   void repeat_tick();
+  void sync_mutes();
 
   lv_obj_t* root_ = nullptr;      // hidden tile that covers the screen
   lv_obj_t* path_label_ = nullptr;
