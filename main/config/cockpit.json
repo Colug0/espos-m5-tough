@@ -2,7 +2,7 @@
   "namespace": "cockpit",
   "version": 1,
   "title": "Display",
-  "description": "Display behaviour that is not part of a layout: day and night brightness, the status strip on swipe and the layout push port. The namespace is \"cockpit\" because the espOS HMI Designer writes cockpit.brightness, as it does on espos-p4-cockpit.",
+  "description": "Display behaviour that is not part of a layout: day and night brightness, the status and tab strips on swipe and the layout push port. The namespace is \"cockpit\" because the espOS HMI Designer writes cockpit.brightness, as it does on espos-p4-cockpit.",
   "keys": [
     {
       "name": "brightness",
@@ -30,8 +30,8 @@
       "min": 1,
       "max": 60,
       "unit": "s",
-      "title": "Status strip on swipe",
-      "description": "For a layout that hides the status strip: a swipe down from the top edge shows it above the widgets for this long. Any touch while it shows starts the time again; a tap on it closes it. While Signal K is unreachable it stays up."
+      "title": "Strips on swipe",
+      "description": "For a layout that hides the status strip: a swipe down from the top edge shows it above the widgets for this long. Any touch while it shows starts the time again; a tap on it closes it. While Signal K is unreachable it stays up. The same time applies to a tab strip a layout sets to overlay, shown by a swipe up from the bottom edge or a page swipe; a tap on a tab closes it."
     },
     {
       "name": "api_port",
