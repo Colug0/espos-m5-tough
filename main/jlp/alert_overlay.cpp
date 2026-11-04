@@ -238,10 +238,13 @@ void AlertOverlay::play(const Notification& n) {
 void AlertOverlay::repeat_tick() {
   if (!enabled_) return;
   // Mute ends the repeats; unmuting does not restart them, the next
-  // escalation does.
-  if (chime().muted()) {
+  // escalation does. The count also catches a mute switched off again
+  // between two ticks.
+  const uint32_t mutes = chime().mutes();
+  if (chime().muted() || mutes != mutes_seen_) {
+    mutes_seen_ = mutes;
     last_chime_.clear();
-    return;
+    if (chime().muted()) return;
   }
   // Forget paths that are no longer pending (acked, cleared, gone), so a
   // later alarm on the same path starts its own count.
