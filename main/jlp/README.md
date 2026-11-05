@@ -28,7 +28,7 @@ so in its header. What changed for the M5Stack Tough:
 | The zone and layout fetch tasks log their stack high-water mark when they end | `net/zone_fetch.cpp`, `net/layout_fetch.cpp` |
 | Tab strip and pages in a flex column, so the strip never covers a page | `layout/layout_manager.cpp` |
 | HTTP handlers: the semaphore a handler waits on is shared with the UI-task lambda, so a timeout leaves no dangling handle; a request body not complete within 10 s gives 408 (receive timeout 10 s instead of 120 s); a `/layout` 504 means the layout was not applied; a timed-out screenshot keeps the single-flight flag until its snapshot has run | `net/http_api.cpp` |
-| Non-finite numbers from Signal K are dropped; a REST seed no longer overwrites a newer stream value; the int seed is clamped before the cast | `subject_registry.*`, `net/zone_fetch.cpp` |
+| Non-finite numbers and text that is no number on a numeric path are dropped from Signal K; a REST seed no longer overwrites a newer stream value; the int seed is clamped before the cast | `subject_registry.*`, `net/zone_fetch.cpp` |
 | `zones: []` removes a path's zones instead of keeping the old ones | `zone_registry.cpp` |
 | The notification log line says whether the source asked for sound (`sound`/`silent`) | `notifications_registry.cpp` |
 | Chime tones at 1.6-2.6 kHz, shaped towards a square, alarms at full scale and longer, for the Tough's small speaker | `audio/chime.cpp` |
