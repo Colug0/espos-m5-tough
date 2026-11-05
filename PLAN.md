@@ -301,8 +301,12 @@ eine Nacht lang am Halpi2 ohne Neustart.
       vollen 240 px, Wischen vom oberen Rand blendet die Leiste für
       `cockpit.status_peek_s` (Vorgabe 5 s) über den Widgets ein, ohne Signal K
       steht sie dauerhaft
-- [ ] Tab-Leiste als Einblendung, damit die Widgets auch die 56 px bekommen;
-      braucht ein Layout-Feld und den Designer, vorher mit Dirk klären
+- [x] Tab-Leiste als Einblendung: `tab_strip: "overlay-bottom"` gibt den
+      Seiten die vollen 240 px, Wischen vom unteren Rand blendet die Leiste ein;
+      waagerechtes Wischen blättert in jedem Layout mit mehreren Seiten (mit
+      Dirk abgestimmt in espos-p4-cockpit #209)
+- [ ] Tab-Leiste als Einblendung im Cockpit, im Designer und in der
+      WASM-Vorschau (PRs an die Repos)
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
 ## PRs an andere Projekte

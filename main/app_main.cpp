@@ -171,6 +171,12 @@ void poll_status_line() {
   }
 }
 
+// One setting for both strips that show on a swipe. UI task.
+void set_peek_seconds(uint32_t seconds) {
+  jlp::overlay().set_peek_seconds(seconds);
+  jlp::layout_manager().set_tab_peek_seconds(seconds);
+}
+
 // Runs on the UI task once the panel is up.
 void player_up() {
   char host[33] = "";
@@ -254,7 +260,7 @@ esp_err_t board_up(void*) {
   espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_BRIGHTNESS, &day);
   espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_NIGHT_BRIGHT, &night);
   espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, ESPOS_CFG_COCKPIT_STATUS_PEEK_S, &peek_s);
-  ui::post([peek_s] { jlp::overlay().set_peek_seconds(static_cast<uint32_t>(peek_s)); });
+  ui::post([peek_s] { set_peek_seconds(static_cast<uint32_t>(peek_s)); });
   // Config callbacks run on the writer's task (httpd, the slider's commit).
   // The idle dimmer drives the backlight and the @brightness subject, so the
   // change is posted to the UI task.
@@ -264,7 +270,7 @@ esp_err_t board_up(void*) {
         if (strcmp(key, ESPOS_CFG_COCKPIT_STATUS_PEEK_S) == 0) {
           int32_t s = 5;
           espos_config_get_i32(ESPOS_CFG_NS_COCKPIT, key, &s);
-          ui::post([s] { jlp::overlay().set_peek_seconds(static_cast<uint32_t>(s)); });
+          ui::post([s] { set_peek_seconds(static_cast<uint32_t>(s)); });
           return;
         }
         const bool is_day = strcmp(key, ESPOS_CFG_COCKPIT_BRIGHTNESS) == 0;
