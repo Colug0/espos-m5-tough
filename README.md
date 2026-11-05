@@ -21,8 +21,10 @@ the display's old connection and deliver nothing to it for minutes. Turn on
 `wifi.fresh_assoc` in the device's web UI under WiFi: the display then drops
 its first association after each start and joins again, about two seconds per
 boot. Other access points do not need it. Up to v0.5.0 the firmware did this
-on every boot by itself; when you update from such a version on a MikroTik
-network, turn the setting on before the update.
+on every boot by itself and had no setting for it; after updating from such a
+version on a MikroTik network, turn the setting on. An OTA update restarts
+cleanly, so the access point lets go of the old connection; after a USB flash
+the display can take a few minutes to become reachable for that once.
 
 ## Licence
 
