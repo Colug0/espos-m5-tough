@@ -6,8 +6,9 @@
 # requires is not compiled, and espos_start() starts only what is in the
 # build. Without espos_ota the display could never be updated in the field.
 file(GLOB_RECURSE jlp_sources ${CMAKE_CURRENT_LIST_DIR}/jlp/*.cpp)
+file(GLOB jlp_fonts ${CMAKE_CURRENT_LIST_DIR}/jlp/fonts/*.c)
 idf_component_register(
-    SRCS app_main.cpp jpeg_psram.c ${jlp_sources}
+    SRCS app_main.cpp jpeg_psram.c ${jlp_sources} ${jlp_fonts}
     INCLUDE_DIRS "."
     PRIV_REQUIRES tough_hal espos_core espos_event espos_health espos_net espos_wifi espos_sk
                   espos_ota espos_config espos_audio esp_app_format esp_event esp_timer esp_wifi
