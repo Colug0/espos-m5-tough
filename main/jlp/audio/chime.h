@@ -56,12 +56,16 @@ class Chime {
   // again on its own.
   void set_muted(bool m);
   bool muted() const { return muted_; }
+  /// Counts the times mute was switched on, so a reader polling muted()
+  /// also sees a mute that was switched off again before it looked.
+  uint32_t mutes() const { return mutes_; }
 
  private:
   // Published by init() only after clips_ is built: /beep can call play()
   // from the httpd task while the UI task is still in init().
   std::atomic<espos_audio::AudioDriver*> audio_{nullptr};
   std::atomic_bool muted_{false};
+  std::atomic<uint32_t> mutes_{0};
   // One clip per sounding state (Alert..Emergency), synthesised once in
   // init() and read-only afterwards, so play() needs no lock and costs the
   // UI task nothing beyond handing the clip over.

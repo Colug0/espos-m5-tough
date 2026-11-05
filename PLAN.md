@@ -311,7 +311,8 @@ eine Nacht lang am Halpi2 ohne Neustart.
       nehmen ohne `font_size` die größte passende Schrift; Ziffern-Schriften
       bis 140 px, damit „88.8“ die 320 px füllt
 - [ ] Designer: 4-px-Raster auf kleinen Panels und Schriftgrößen bis 140 px
-      (läuft als lokaler Build auf dem Halpi2, PR später); Schriftgrößen im
+      (läuft als lokaler Build auf dem Halpi2; Raster in signalk-espos-hmi-designer
+      #91, Schriftgrößen noch ohne PR); Schriftgrößen im
       Cockpit und in `/hello` später mit Dirk
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
