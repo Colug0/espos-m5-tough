@@ -63,7 +63,9 @@ Open the HMI Designer from the Signal K admin page, enter the display's
 address with port 8081 (`http://<display-ip>:8081`; use the IP if the server
 cannot resolve `.local` names) and press **Connect**. The canvas takes the
 Tough's 320x240 size. Lay out the widgets, then **Push**: the display switches
-to the new layout at once and keeps it across restarts.
+to the new layout at once and keeps it across restarts. If the display could
+not store it, its reply to the push carries the warning `layout rendered but
+not persisted` and the layout lasts only until the next restart.
 
 ## Updates
 
