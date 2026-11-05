@@ -16,4 +16,6 @@ layouts as [espos-p4-cockpit](https://github.com/dirkwa/espos-p4-cockpit).
 
 ## Licence
 
-Apache-2.0, see [LICENSE](LICENSE).
+Apache-2.0, see [LICENSE](LICENSE). The number fonts in `main/jlp/fonts/`
+are generated from Montserrat and stay under the SIL Open Font License 1.1
+([OFL.txt](main/jlp/fonts/OFL.txt)).

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <vector>
 
@@ -28,6 +29,7 @@ namespace ui = tough_hal::ui;
 
 #include "../audio/chime.h"
 #include "../features.h"
+#include "../fonts/digit_fonts.h"
 #if JLP_VOICE
 #include "../audio/voice_control.h"
 #endif
@@ -106,13 +108,26 @@ void apply_geometry(lv_obj_t* obj, JsonObjectConst spec) {
 
 // Resolve a desired pixel font size to a compiled Montserrat font.
 // LVGL can't synthesize fonts at runtime — we have to pick from
-// what's compiled in (lv_conf.h: LV_FONT_MONTSERRAT_{14,16,20,28,36}
-// on the cockpit build). Snap to the closest compiled size below
+// what's compiled in (lv_conf.h: LV_FONT_MONTSERRAT_{14,16,20,28,36,40,
+// 44,48} on the Tough, and the digit fonts up to 140 px for a widget
+// that shows only a number). Snap to the closest compiled size below
 // `desired` so tiles don't overflow when the operator picks a
 // larger-than-fits value; `fallback` is the size used when the
 // spec doesn't specify (preserves existing per-widget defaults).
-const lv_font_t* resolve_font(int desired_px, const lv_font_t* fallback) {
+const lv_font_t* resolve_font(int desired_px, const lv_font_t* fallback,
+                              bool digits) {
   if (desired_px <= 0) return fallback;
+  if (digits) {
+    if (desired_px >= 140) return &lv_font_montserrat_digits_140;
+    if (desired_px >= 120) return &lv_font_montserrat_digits_120;
+    if (desired_px >= 104) return &lv_font_montserrat_digits_104;
+    if (desired_px >= 88) return &lv_font_montserrat_digits_88;
+    if (desired_px >= 72) return &lv_font_montserrat_digits_72;
+    if (desired_px >= 60) return &lv_font_montserrat_digits_60;
+  }
+  if (desired_px >= 48) return &lv_font_montserrat_48;
+  if (desired_px >= 44) return &lv_font_montserrat_44;
+  if (desired_px >= 40) return &lv_font_montserrat_40;
   if (desired_px >= 36) return &lv_font_montserrat_36;
   if (desired_px >= 28) return &lv_font_montserrat_28;
   if (desired_px >= 20) return &lv_font_montserrat_20;
@@ -120,13 +135,87 @@ const lv_font_t* resolve_font(int desired_px, const lv_font_t* fallback) {
   return &lv_font_montserrat_14;
 }
 
+// Size of `text` in `font`, UTF-8 decoded and line by line as LVGL draws
+// it without wrapping.
+lv_point_t text_size(const char* text, const lv_font_t* font) {
+  lv_point_t size{};
+  lv_text_get_size(&size, text, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  return size;
+}
+
+int32_t text_width(const char* text, const lv_font_t* font) {
+  return text_size(text, font).x;
+}
+
+// Every font a widget may pick, largest first; the first six are the
+// number-only fonts.
+const lv_font_t* const kLargestFirst[] = {
+    &lv_font_montserrat_digits_140, &lv_font_montserrat_digits_120,
+    &lv_font_montserrat_digits_104, &lv_font_montserrat_digits_88,
+    &lv_font_montserrat_digits_72,  &lv_font_montserrat_digits_60,
+    &lv_font_montserrat_48,         &lv_font_montserrat_44,
+    &lv_font_montserrat_40,         &lv_font_montserrat_36,
+    &lv_font_montserrat_28,         &lv_font_montserrat_20,
+    &lv_font_montserrat_16,         &lv_font_montserrat_14};
+constexpr size_t kDigitFonts = 6;
+
+// The font a widget uses when the layout sets no `display.font_size`:
+// the largest compiled font in which `sample` fits `max_w` x `max_h`,
+// but never smaller than `floor`, the size the widget had before it
+// grew with its box, so an existing layout keeps its look. `digits`
+// admits the number-only fonts above 48 px.
+const lv_font_t* fit_font(const char* sample, int32_t max_w, int32_t max_h,
+                          const lv_font_t* floor, bool digits = false) {
+  for (size_t i = digits ? 0 : kDigitFonts; i < std::size(kLargestFirst); ++i) {
+    const lv_font_t* f = kLargestFirst[i];
+    if (f == floor) return floor;
+    const lv_point_t size = text_size(sample, f);
+    if (size.x <= max_w && size.y <= max_h) {
+      return f;
+    }
+  }
+  return floor;
+}
+
+// Keeps a live readout inside `max_w`: `base` while the text fits, else
+// the largest smaller font that does, so a value with more digits than
+// the widget was sized for (1013 hPa, -12.5) shrinks instead of being cut.
+void fit_text(lv_obj_t* label, const lv_font_t* base, int32_t max_w) {
+  const char* text = lv_label_get_text(label);
+  const lv_font_t* font = &lv_font_montserrat_14;
+  bool below = false;
+  for (const lv_font_t* f : kLargestFirst) {
+    below = below || f == base;
+    if (below && text_width(text, f) <= max_w) {
+      font = f;
+      break;
+    }
+  }
+  if (lv_obj_get_style_text_font(label, LV_PART_MAIN) != font) {
+    lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
+  }
+}
+
+// A sample of the widest number `decimals` gives, three integer digits.
+void number_sample(char* buf, size_t len, int decimals, const char* unit) {
+  int n = snprintf(buf, len, "888");
+  if (decimals > 0 && n > 0 && (size_t)n < len) {
+    n += snprintf(buf + n, len - n, ".%.*s", decimals, "88888888");
+  }
+  if (unit && *unit && n > 0 && (size_t)n < len) {
+    snprintf(buf + n, len - n, " %s", unit);
+  }
+}
+
 // Read `display.font_size` if present; otherwise return fallback.
+// `digits` for a widget whose text is only a number.
 const lv_font_t* font_from_spec(JsonObjectConst spec,
-                                const lv_font_t* fallback) {
+                                const lv_font_t* fallback,
+                                bool digits = false) {
   JsonObjectConst display = spec["display"];
   if (display.isNull()) return fallback;
   int sz = display["font_size"] | 0;
-  return resolve_font(sz, fallback);
+  return resolve_font(sz, fallback, digits);
 }
 
 // Returns the zone-coded color for `display_value` on `path`, or
@@ -172,8 +261,9 @@ lv_obj_t* build_label(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
     lv_obj_t* lbl = lv_label_create(ctx.parent);
     apply_geometry(lbl, spec);
     lv_obj_set_style_text_color(lbl, lv_color_hex(colors.fg), LV_PART_MAIN);
-    lv_obj_set_style_text_font(
-        lbl, font_from_spec(spec, &lv_font_montserrat_28), LV_PART_MAIN);
+    const lv_font_t* fit = fit_font(caption ? caption : "", spec["w"] | 120,
+                                    spec["h"] | 60, &lv_font_montserrat_28);
+    lv_obj_set_style_text_font(lbl, font_from_spec(spec, fit), LV_PART_MAIN);
     lv_label_set_text(lbl, caption ? caption : "");
     return lbl;
   }
@@ -201,10 +291,22 @@ lv_obj_t* build_label(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
     lv_obj_align(cap, LV_ALIGN_TOP_LEFT, 0, 0);
   }
 
+  // The body grows with the tile, sized for the formatted value. A
+  // description has no known width, so it keeps the default.
+  const lv_font_t* body_font = &lv_font_montserrat_28;
+  if (!show_description) {
+    const Disp d = parse_display(spec);
+    char sample[32];
+    number_sample(sample, sizeof(sample), d.decimals, d.unit);
+    const int32_t pad = 2 * 4;
+    const int32_t cap_h = caption && *caption ? 20 : 0;
+    body_font = fit_font(sample, (spec["w"] | 120) - pad,
+                         (spec["h"] | 60) - pad - cap_h, body_font);
+  }
   lv_obj_t* val = lv_label_create(root);
   lv_obj_set_style_text_color(val, lv_color_hex(colors.fg), LV_PART_MAIN);
-  lv_obj_set_style_text_font(
-      val, font_from_spec(spec, &lv_font_montserrat_28), LV_PART_MAIN);
+  const lv_font_t* val_font = font_from_spec(spec, body_font);
+  lv_obj_set_style_text_font(val, val_font, LV_PART_MAIN);
   // If a description is already in the registry (loaded via REST
   // fetch on layout apply), show it immediately so the widget is
   // legible before — or even without — the first value delta. Slow-
@@ -231,8 +333,11 @@ lv_obj_t* build_label(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
     lv_obj_t* tile;
     Colors colors;
     bool show_description;
+    const lv_font_t* font;
+    int32_t max_w;
   };
-  auto* lctx = new LabelCtx{parse_display(spec), root, colors, show_description};
+  auto* lctx = new LabelCtx{parse_display(spec), root,     colors,
+                            show_description,   val_font, (spec["w"] | 120) - 2 * 4};
   lv_obj_set_user_data(val, lctx);
   lv_obj_add_event_cb(
       val,
@@ -260,6 +365,7 @@ lv_obj_t* build_label(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
         if (!wrote_desc) {
           lv_label_set_text_fmt(w, "%.*f %s", lc->d.decimals, v, lc->d.unit);
         }
+        fit_text(w, lc->font, lc->max_w);
         // Zones are in raw SK units (e.g. ratio 0..1 for SOC); match
         // against raw. Fall back to the spec'd bg_color when no zone
         // matches — zone always wins to keep alarms visible.
@@ -328,12 +434,23 @@ lv_obj_t* build_value(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
 
   // Big centered value. Font size: explicit `display.font_size`
   // wins; otherwise auto-scale with tile height so a tall tile
-  // reads from across the cockpit.
+  // reads from across the cockpit. Above the old 28 px it grows to the
+  // largest font the number fits, keeping clear of the caption at the
+  // top and the unit at the bottom.
   int box_h = spec["h"] | 60;
   const lv_font_t* default_big = &lv_font_montserrat_28;
   if (box_h < 60) default_big = &lv_font_montserrat_20;
   if (box_h < 40) default_big = &lv_font_montserrat_16;
-  const lv_font_t* big_font = font_from_spec(spec, default_big);
+  const Disp disp = parse_display(spec);
+  char sample[32];
+  number_sample(sample, sizeof(sample), disp.decimals, nullptr);
+  const int32_t pad = 2 * 6;
+  const int32_t side_h = (caption && *caption) || disp.unit[0]
+                             ? 2 * lv_font_get_line_height(&lv_font_montserrat_14)
+                             : 0;
+  default_big = fit_font(sample, (spec["w"] | 120) - pad, box_h - pad - side_h,
+                         default_big, /*digits=*/true);
+  const lv_font_t* big_font = font_from_spec(spec, default_big, /*digits=*/true);
   lv_obj_t* val = lv_label_create(root);
   lv_obj_set_style_text_color(val, lv_color_hex(colors.fg), LV_PART_MAIN);
   lv_obj_set_style_text_font(val, big_font, LV_PART_MAIN);
@@ -355,8 +472,11 @@ lv_obj_t* build_value(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
     lv_obj_t* tile;
     lv_obj_t* unit_lbl;
     Colors colors;
+    const lv_font_t* font;
+    int32_t max_w;
   };
-  auto* vctx = new ValueCtx{parse_display(spec), root, unit_lbl, colors};
+  auto* vctx = new ValueCtx{parse_display(spec), root,     unit_lbl,
+                            colors,             big_font, (spec["w"] | 120) - pad};
   lv_obj_set_user_data(val, vctx);
   lv_obj_add_event_cb(
       val,
@@ -376,6 +496,7 @@ lv_obj_t* build_value(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
         // in its own bottom-right label so it doesn't grow / shrink
         // the centered text when the value width changes).
         lv_label_set_text_fmt(w, "%.*f", vc->d.decimals, v);
+        fit_text(w, vc->font, vc->max_w);
         // unit_lbl and tile are SIBLING objects, not the observer's
         // own target. During a layout swap LVGL can free them before
         // this observer's target label, and the synchronous notify
@@ -2280,10 +2401,19 @@ lv_obj_t* build_anchor(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
   lv_obj_set_style_line_width(needle, 3, LV_PART_MAIN);
   lv_obj_set_style_line_rounded(needle, true, LV_PART_MAIN);
 
-  // Centre distance + caption.
+  // Centre distance + caption. The distance grows with the dial: the
+  // largest font whose number fits three quarters of the ring's inner
+  // width and a third of its height, leaving room for the caption.
+  const int32_t inner = ring_side - 2 * (side / 14);
+  char dist_sample[32];
+  number_sample(dist_sample, sizeof(dist_sample), parse_display(spec).decimals,
+                nullptr);
   lv_obj_t* dist = lv_label_create(root);
   lv_obj_set_style_text_color(dist, lv_color_hex(colors.fg), LV_PART_MAIN);
-  lv_obj_set_style_text_font(dist, &lv_font_montserrat_28, LV_PART_MAIN);
+  const lv_font_t* dist_fit = fit_font(dist_sample, inner * 3 / 4, inner / 3,
+                                       &lv_font_montserrat_28, /*digits=*/true);
+  lv_obj_set_style_text_font(
+      dist, font_from_spec(spec, dist_fit, /*digits=*/true), LV_PART_MAIN);
   lv_label_set_text(dist, "--");  // ASCII: U+2014 em-dash tofus on-device
   lv_obj_align(dist, LV_ALIGN_CENTER, 0, -4);
 

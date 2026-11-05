@@ -307,6 +307,12 @@ eine Nacht lang am Halpi2 ohne Neustart.
       Dirk abgestimmt in espos-p4-cockpit #209)
 - [ ] Tab-Leiste als Einblendung im Cockpit, im Designer und in der
       WASM-Vorschau (PRs an die Repos)
+- [x] Schrift wächst mit dem Widget: `value`, `label` und die Anker-Mitte
+      nehmen ohne `font_size` die größte passende Schrift; Ziffern-Schriften
+      bis 140 px, damit „88.8“ die 320 px füllt
+- [ ] Designer: 4-px-Raster auf kleinen Panels und Schriftgrößen bis 140 px
+      (läuft als lokaler Build auf dem Halpi2, PR später); Schriftgrößen im
+      Cockpit und in `/hello` später mit Dirk
 - [ ] Mit Dirk: den JLP-Kern als gemeinsame Komponente herauslösen
 
 ## PRs an andere Projekte

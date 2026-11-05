@@ -41,13 +41,15 @@
 
 #define LV_USE_FLOAT 1
 
-/* Fonts: the sizes the JLP protocol allows for display.font_size, plus 48 for
- * big readouts. */
+/* Fonts: the sizes the JLP protocol allows for display.font_size, plus 40 to
+ * 48 for big readouts, which a widget picks when it is tall enough. */
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_MONTSERRAT_36 1
+#define LV_FONT_MONTSERRAT_40 1
+#define LV_FONT_MONTSERRAT_44 1
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_16
 
