@@ -89,6 +89,7 @@ class LayoutManager {
   // shows an overlay tab strip.
   void on_press();
   void track_swipe();
+  void cancel_swipe();
 
   lv_obj_t* parent_ = nullptr;
   lv_indev_t* indev_ = nullptr;
