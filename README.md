@@ -20,7 +20,9 @@ After a power cut or a crash, a MikroTik access point (RouterOS 7) can keep
 the display's old connection and deliver nothing to it for minutes. Turn on
 `wifi.fresh_assoc` in the device's web UI under WiFi: the display then drops
 its first association after each start and joins again, about two seconds per
-boot. Other access points do not need it.
+boot. Other access points do not need it. Up to v0.5.0 the firmware did this
+on every boot by itself; when you update from such a version on a MikroTik
+network, turn the setting on before the update.
 
 ## Licence
 
