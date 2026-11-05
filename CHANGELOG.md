@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 (2026-11-05)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Added
+* feat(layout): tab strip as overlay, page swipes by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/23
+* feat(widgets): grow value text with the widget by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/24
+### Fixed
+* fix(jlp): end repeats on mute, clamp repeat_s by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/22
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.4.0...v0.5.0
+
 ## 0.4.0 (2026-11-04)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
