@@ -2237,6 +2237,8 @@ struct AnchorCtx {
   lv_point_precise_t needle_pts[2];
   float cx, cy, needle_len;
   Disp dist_disp;        // display scaling for the centre distance text
+  const lv_font_t* dist_font = nullptr;  // fitted or explicit size
+  int32_t dist_max_w = 0;                // width the distance may take
   // Last-known values; any observer redraws from these.
   bool state_on = false;    // navigation.anchor.state == "on"
   bool have_bearing = false;
@@ -2304,6 +2306,7 @@ static void anchor_render(AnchorCtx* a) {
   // Centre distance (currentRadius) in display units.
   float dv = a->cur_m * a->dist_disp.scale + a->dist_disp.offset;
   lv_label_set_text_fmt(a->dist, "%.*f", a->dist_disp.decimals, dv);
+  fit_text(a->dist, a->dist_font, a->dist_max_w);
   if (a->max_m > 0.f) {
     float mv = a->max_m * a->dist_disp.scale + a->dist_disp.offset;
     lv_label_set_text_fmt(a->caption, "of %.*f %s", a->dist_disp.decimals, mv,
@@ -2412,8 +2415,8 @@ lv_obj_t* build_anchor(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
   lv_obj_set_style_text_color(dist, lv_color_hex(colors.fg), LV_PART_MAIN);
   const lv_font_t* dist_fit = fit_font(dist_sample, inner * 3 / 4, inner / 3,
                                        &lv_font_montserrat_28, /*digits=*/true);
-  lv_obj_set_style_text_font(
-      dist, font_from_spec(spec, dist_fit, /*digits=*/true), LV_PART_MAIN);
+  const lv_font_t* dist_font = font_from_spec(spec, dist_fit, /*digits=*/true);
+  lv_obj_set_style_text_font(dist, dist_font, LV_PART_MAIN);
   lv_label_set_text(dist, "--");  // ASCII: U+2014 em-dash tofus on-device
   lv_obj_align(dist, LV_ALIGN_CENTER, 0, -4);
 
@@ -2432,6 +2435,8 @@ lv_obj_t* build_anchor(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
   a->cy = cy;
   a->needle_len = ring_side / 2.0f - side / 14.0f - 4.0f;
   a->dist_disp = parse_display(spec);
+  a->dist_font = dist_font;
+  a->dist_max_w = inner * 3 / 4;
   // The centre text is currentRadius; if the layout gave no display
   // unit, default to metres (the SK unit for the radius paths).
   if (a->dist_disp.unit[0] == '\0') {
