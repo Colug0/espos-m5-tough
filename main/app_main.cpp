@@ -20,7 +20,6 @@
 
 #include "esp_app_desc.h"
 #include "esp_event.h"
-#include "esp_wifi.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -140,23 +139,6 @@ void on_espos_event(void*, esp_event_base_t, int32_t id, void*) {
     default:
       break;
   }
-}
-
-// The ESP32 restarts without deauthenticating, so the access point still holds
-// the previous association when the new one arrives. A MikroTik hAP ax S
-// (RouterOS 7.24.4) then logs "reconnecting" instead of "connected", keeps
-// the old station state, and for minutes delivers nothing to the device while
-// its own frames and broadcasts get through (measured 2026-11-01: no ping from
-// the router, no Signal K). Removing the station on the router fixed it at
-// once. So the first association of every boot is dropped on purpose: the
-// deauthentication makes the access point forget the old station, and espOS
-// connects again straight away, now as a new one. Costs about two seconds.
-// Belongs in espOS's WiFi handling once it is fixed there.
-void on_wifi_event(void*, esp_event_base_t, int32_t id, void*) {
-  static std::atomic<bool> done{false};
-  if (id != WIFI_EVENT_STA_CONNECTED || done.exchange(true)) return;
-  ESP_LOGI(TAG, "dropping the first association so the access point starts a fresh one");
-  esp_wifi_disconnect();
 }
 
 // The 320 px strip has room for the signal strength, not the SSID.
@@ -310,8 +292,6 @@ extern "C" void app_main(void) {
                      ESPOS_EVENT_SK_STREAM_DISCONNECTED}) {
     ESP_ERROR_CHECK(espos_event_subscribe(id, on_espos_event, nullptr));
   }
-  // The default loop exists now (espos_event_subscribe creates it if needed).
-  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, on_wifi_event, nullptr));
 
   espos_start_opts_t opts = ESPOS_START_OPTS_DEFAULT;
   opts.app_name = "m5-tough";

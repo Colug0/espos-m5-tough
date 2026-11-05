@@ -14,6 +14,14 @@ layouts as [espos-p4-cockpit](https://github.com/dirkwa/espos-p4-cockpit).
 **Status:** in development, nothing to flash yet. The plan is in
 [PLAN.md](PLAN.md).
 
+## MikroTik access points
+
+After a power cut or a crash, a MikroTik access point (RouterOS 7) can keep
+the display's old connection and deliver nothing to it for minutes. Turn on
+`wifi.fresh_assoc` in the device's web UI under WiFi: the display then drops
+its first association after each start and joins again, about two seconds per
+boot. Other access points do not need it.
+
 ## Licence
 
 Apache-2.0, see [LICENSE](LICENSE). The number fonts in `main/jlp/fonts/`

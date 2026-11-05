@@ -63,9 +63,12 @@ Non-negotiable, as in the cockpit:
 * WiFi/lwIP buffers in PSRAM made internal RAM worse on this chip, not better;
   capping the dynamic RX buffers and the TCP window is what helped.
 * The ESP32 restarts without deauthenticating. The boat's MikroTik then keeps
-  the old station state and delivers nothing to the device for minutes, so
-  `app_main.cpp` drops the first association of every boot. Check the router
-  log for "reconnecting" before blaming firmware for a lost Signal K link.
+  the old station state and delivers nothing to the device for minutes. On a
+  MikroTik network set `wifi.fresh_assoc` to `true` (web UI or
+  `PUT /api/v1/config`); espOS then drops the first association of every boot.
+  It is off by default and lives in NVS, so a fresh flash that erases NVS needs
+  it set again. Check the router log for "reconnecting" before blaming
+  firmware for a lost Signal K link.
 * `espos_start_opts_t.board` is `"M5Stack Tough"` and the CMake project name is
   `m5_tough`. Never change either: OTA and the registry match on them.
 
