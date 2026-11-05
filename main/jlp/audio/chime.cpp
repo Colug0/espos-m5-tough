@@ -22,7 +22,7 @@ namespace jlp {
 static constexpr const char* kChimeMutedKey = "chime_muted";
 
 void Chime::set_muted(bool m) {
-  muted_ = m;
+  if (!muted_.exchange(m) && m) ++mutes_;
   store_flag_set(kChimeMutedKey, m);
 }
 
