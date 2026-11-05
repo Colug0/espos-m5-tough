@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2 (2026-11-05)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(jlp): ignore text that is no number by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/25
+* fix(layout): hide the strip on select, end swipe on swap by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/30
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.5.1...v0.5.2
+
 ## 0.5.1 (2026-11-05)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
