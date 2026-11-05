@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1 (2026-11-05)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(net): use espOS's fresh association at boot by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/29
+### Other
+* fix: bump espOS to v0.26.1 by @github-actions[bot] in https://github.com/Colug0/espos-m5-tough/pull/21
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.5.0...v0.5.1
+
 ## 0.5.0 (2026-11-05)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
