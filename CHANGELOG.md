@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.3 (2026-11-05)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(layout): end the press on a remote page change by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/33
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.5.2...v0.5.3
+
 ## 0.5.2 (2026-11-05)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
