@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.4 (2026-11-10)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(layout): end a press at once on a page change by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/37
+### Other
+* fix: bump espOS to v0.27.0 by @github-actions[bot] in https://github.com/Colug0/espos-m5-tough/pull/35
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.5.3...v0.5.4
+
 ## 0.5.3 (2026-11-05)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
