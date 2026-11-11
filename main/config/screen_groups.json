@@ -35,7 +35,7 @@
       "max": 600,
       "unit": "s",
       "title": "Hold time",
-      "description": "How long a new state must stay before the group follows it, so a state that flickers does not flip the pages. The first state after a restart switches at once."
+      "description": "How long the state must keep selecting another group before the group follows, so a state that flickers does not flip the pages. Values of one group count as one: sailing then motoring is one wait. The first state after a restart switches at once."
     }
   ]
 }

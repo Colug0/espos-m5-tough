@@ -50,7 +50,9 @@ struct ValueResult {
   bool is_float = false;
   float f = 0.0f;
   int i = 0;
-  bool is_str = false;  // a text value, for the page groups' state path
+  bool is_str = false;  // a text value: for the page groups only
+  // The value as the stream would carry it: a string's text, else its
+  // JSON. The page groups match their states against it.
   std::string s;
 };
 
@@ -108,6 +110,11 @@ void fetch_value(const std::string& path, std::vector<ValueResult>* out) {
   ValueResult r;
   r.path = path;
   r.requested_us = requested_us;
+  if (v.is<const char*>()) {
+    r.s = v.as<const char*>();
+  } else {
+    serializeJson(v, r.s);
+  }
   // Check bool and int before float: ArduinoJson reports is<float>() true
   // for integers too, so testing float first would route an integer
   // reading through as<float>() and lose precision on large values.
@@ -126,7 +133,6 @@ void fetch_value(const std::string& path, std::vector<ValueResult>* out) {
     // the str_buf is owned by the stream listener (writing it here would
     // race). Only the page groups take it.
     r.is_str = true;
-    r.s = v.as<const char*>();
   } else {
     return;  // an object
   }
@@ -157,10 +163,10 @@ void fetch_task(void* arg) {
       zones().apply_meta(m.path, m.doc.as<JsonObjectConst>());
     }
     for (auto& vr : *values) {
-      if (vr.is_str) {
-        screen_groups().seed(vr.path, vr.s, vr.requested_us);
-        continue;
-      }
+      // Ignored unless it is the page groups' state path, which may also
+      // be a number.
+      screen_groups().seed(vr.path, vr.s, vr.requested_us);
+      if (vr.is_str) continue;
       auto kind = registry().kind_of(vr.path);
       if (!kind) continue;  // path not bound by any widget
       // A stream delta received after this GET started may be newer than

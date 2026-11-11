@@ -123,9 +123,10 @@ void ScreenGroups::reload() {
   hold_ms_ = static_cast<uint32_t>(hold_s) * 1000u;
   layout_manager().set_groups(groups_);
 
-  // The path only matters with a group to pick; unsubscribed otherwise,
-  // since the subscription table is shared with the layout.
-  const std::string want = groups_.empty() ? "" : path;
+  // The path only matters while it may pick a group; unsubscribed
+  // otherwise, since the subscription table is shared with the layout.
+  // Turning the switch on reloads, which subscribes and fetches afresh.
+  const std::string want = groups_.empty() || !auto_ ? "" : path;
   // A failed subscription (the table is shared and bounded) is tried
   // again on the next reload.
   if (want != path_ || (!want.empty() && sub_ <= 0)) {
@@ -165,9 +166,8 @@ void ScreenGroups::deliver(uint32_t gen, const std::string& value, int64_t rx_us
 
 void ScreenGroups::seed(const std::string& path, const std::string& value,
                         int64_t requested_us) {
-  // Two fetches can overlap (the path changed away and back): the one
-  // whose GET started later wins.
-  // A GET from before the path was (re)chosen answers an older choice.
+  // A GET from before the path was (re)chosen answers an older choice,
+  // and of two overlapping fetches the one whose GET started later wins.
   if (path != path_ || requested_us < path_since_us_ || stream_rx_us_ > requested_us ||
       seed_req_us_ > requested_us) {
     return;

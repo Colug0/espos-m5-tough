@@ -274,11 +274,14 @@ bool build_screens(lv_obj_t* root, JsonObjectConst doc, JsonArrayConst screens,
     sctx->tabs.push_back(btn);
   }
 
-  // The group tab, last in the row and as wide as its label. Hidden until
-  // page groups give it a group to switch to.
+  // The group tab, last in the row and as wide as its label up to a third
+  // of the strip, so a long group name cannot squeeze the page tabs; a
+  // longer name ends in dots. Hidden until page groups give it a group to
+  // switch to.
   {
     lv_obj_t* btn = lv_obj_create(strip);
     lv_obj_set_size(btn, LV_SIZE_CONTENT, lv_pct(100));
+    lv_obj_set_style_max_width(btn, lv_pct(33), LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(kStripBgHex), LV_PART_MAIN);
     lv_obj_set_style_border_color(btn, lv_color_hex(kTabActiveBgHex),
                                   LV_PART_MAIN);
@@ -289,6 +292,8 @@ bool build_screens(lv_obj_t* root, JsonObjectConst doc, JsonArrayConst screens,
     lv_obj_set_scrollable(btn, false);
     lv_obj_t* lbl = lv_label_create(btn);
     lv_label_set_text(lbl, "");
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_style_max_width(lbl, lv_pct(100), LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl, lv_color_hex(kTabActiveBgHex),
                                 LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
@@ -778,9 +783,34 @@ bool LayoutManager::select_screen(const std::string& id) {
 }
 
 void LayoutManager::set_groups(std::vector<ScreenGroup> groups) {
+  // A reload must not move the crew: the chosen group is found again by
+  // its name, and each group's last page by its id, so reordering rows or
+  // changing an unrelated setting keeps both.
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  std::string chosen;
+  if (group_ >= 0 && group_ < (int)groups_.size()) chosen = groups_[group_].name;
+  std::vector<std::pair<std::string, std::string>> last;  // group name, page id
+  if (ctx) {
+    for (size_t g = 0; g < ctx->last.size() && g < groups_.size(); g++) {
+      if (ctx->last[g] >= 0) last.emplace_back(groups_[g].name, ctx->ids[ctx->last[g]]);
+    }
+  }
   groups_ = std::move(groups);
-  if (group_ >= (int)groups_.size()) group_ = 0;
+  group_ = 0;
+  for (size_t g = 0; g < groups_.size(); g++) {
+    if (groups_[g].name == chosen) group_ = (int)g;
+  }
   resolve_groups();
+  if (!ctx || ctx->members.empty()) return;
+  for (const auto& [name, id] : last) {
+    for (size_t g = 0; g < groups_.size(); g++) {
+      if (groups_[g].name != name) continue;
+      for (int i : ctx->members[g]) {
+        if (ctx->ids[i] == id) ctx->last[g] = i;
+      }
+    }
+  }
+  if (ctx->group >= 0) ctx->last[ctx->group] = ctx->active;
 }
 
 // Matches the configured groups to the current layout's pages and puts

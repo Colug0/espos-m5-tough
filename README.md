@@ -81,8 +81,9 @@ one row per group:
 `pages` are the screen ids from the designer. The tab strip then shows the
 pages of one group, and a tab at its right end switches to the next group. A
 page that no row lists shows in every group. With **Follow the boat's state**
-on, the group follows `navigation.state` (or the path you set) once a new
-state has held for the hold time, 30 s by default. A group you pick by hand
+on, the group follows `navigation.state` (or the path you set) once the
+state has selected another group for the hold time, 30 s by default. A group
+you pick by hand
 stays until the state selects another group. Signal K needs a source for
 `navigation.state`, such as a plugin that sets it from speed or the anchor
 alarm.
