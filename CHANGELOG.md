@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 (2026-11-11)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Added
+* feat(layout): group pages by boat state by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/39
+### Other
+* fix: bump espOS to v0.28.0 by @github-actions[bot] in https://github.com/Colug0/espos-m5-tough/pull/40
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.5.4...v0.6.0
+
 ## 0.5.4 (2026-11-10)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
