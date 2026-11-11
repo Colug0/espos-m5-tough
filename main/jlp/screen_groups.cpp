@@ -19,6 +19,16 @@ namespace jlp {
 
 namespace {
 
+// A table cell as text. The web UI stores a cell that looks like a number
+// as a number.
+std::string cell_text(JsonVariantConst v) {
+  if (v.is<const char*>()) return v.as<const char*>();
+  if (v.isNull()) return "";
+  std::string out;
+  serializeJson(v, out);
+  return out;
+}
+
 // A table cell, "a, b,c" or a JSON array, as a list without blanks.
 std::vector<std::string> split_list(JsonVariantConst v) {
   std::vector<std::string> out;
@@ -29,12 +39,11 @@ std::vector<std::string> split_list(JsonVariantConst v) {
     out.push_back(std::move(s));
   };
   if (v.is<JsonArrayConst>()) {
-    for (JsonVariantConst e : v.as<JsonArrayConst>()) {
-      if (e.is<const char*>()) add(e.as<const char*>());
-    }
+    for (JsonVariantConst e : v.as<JsonArrayConst>()) add(cell_text(e));
     return out;
   }
-  const char* s = v | "";
+  const std::string text = cell_text(v);
+  const char* s = text.c_str();
   std::string cur;
   for (const char* p = s; *p != '\0'; p++) {
     if (*p == ',') {
@@ -63,11 +72,14 @@ std::vector<ScreenGroup> read_groups() {
     ESP_LOGW(TAG, "groups is not a JSON array of rows; no groups");
     return groups;
   }
-  for (JsonObjectConst row : doc.as<JsonArrayConst>()) {
+  for (JsonVariantConst row : doc.as<JsonArrayConst>()) {
+    // The web UI writes a row as cells in column order (name, states,
+    // pages); a row written as an object by hand is read by name.
+    const bool cells = row.is<JsonArrayConst>();
     ScreenGroup g;
-    g.name = row["name"] | "";
-    g.states = split_list(row["states"]);
-    g.pages = split_list(row["pages"]);
+    g.name = cell_text(cells ? row[0] : row["name"]);
+    g.states = split_list(cells ? row[1] : row["states"]);
+    g.pages = split_list(cells ? row[2] : row["pages"]);
     if (g.pages.empty()) continue;
     if (g.name.empty()) g.name = std::to_string(groups.size() + 1);
     groups.push_back(std::move(g));
@@ -77,10 +89,14 @@ std::vector<ScreenGroup> read_groups() {
 
 void on_update(const espos_sk_update_t* u, void* arg) {
   if (u->value_json == nullptr) return;
-  // JSON text: "\"anchored\"" is anchored, null and numbers stay as they
-  // are and match no group. Copied: the string dies with the callback.
+  // JSON text, decoded: "\"anchored\"" is anchored. null and numbers
+  // keep their text and match no group. Copied: the string dies with the
+  // callback.
   std::string v(u->value_json);
-  if (v.size() >= 2 && v.front() == '"' && v.back() == '"') v = v.substr(1, v.size() - 2);
+  JsonDocument doc;
+  if (deserializeJson(doc, v) == DeserializationError::Ok && doc.is<const char*>()) {
+    v = doc.as<const char*>();
+  }
   const auto gen = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg));
   const int64_t rx_us = esp_timer_get_time();
   tough_hal::ui::post(
@@ -117,6 +133,7 @@ void ScreenGroups::reload() {
     gen_++;
     state_.clear();
     stream_rx_us_ = 0;
+    seed_req_us_ = 0;
     if (!path_.empty()) {
       sub_ = espos_sk_subscribe(path_.c_str(), 1000, on_update,
                                 reinterpret_cast<void*>(static_cast<uintptr_t>(gen_)));
@@ -145,7 +162,10 @@ void ScreenGroups::deliver(uint32_t gen, const std::string& value, int64_t rx_us
 
 void ScreenGroups::seed(const std::string& path, const std::string& value,
                         int64_t requested_us) {
-  if (path != path_ || stream_rx_us_ > requested_us) return;
+  // Two fetches can overlap (the path changed away and back): the one
+  // whose GET started later wins.
+  if (path != path_ || stream_rx_us_ > requested_us || seed_req_us_ > requested_us) return;
+  seed_req_us_ = requested_us;
   ESP_LOGI(TAG, "%s is %s", path_.c_str(), value.c_str());
   state_ = value;
   on_state(value);

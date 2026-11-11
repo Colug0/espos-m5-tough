@@ -53,6 +53,7 @@ class ScreenGroups {
   uint32_t gen_ = 0;
   std::string state_;     // last value of the path
   int64_t stream_rx_us_ = 0;  // when the stream last delivered it, 0 none
+  int64_t seed_req_us_ = 0;   // when the GET of the applied seed started
   int state_group_ = -1;  // group the last held state selected
   int pending_ = -1;      // group a newer state selects, still holding
   uint32_t pending_since_ = 0;

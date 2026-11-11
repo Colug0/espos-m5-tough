@@ -17,7 +17,7 @@
       "type": "bool",
       "default": true,
       "title": "Follow the boat's state",
-      "description": "Switch the group when the state path changes to a value a group lists. A group chosen by hand stays until the state changes again. Off: groups change by hand only."
+      "description": "Switch the group when the state path changes to a value a group lists. A group chosen by hand stays until the state selects another group. Off: groups change by hand only."
     },
     {
       "name": "path",
