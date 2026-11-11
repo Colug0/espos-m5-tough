@@ -18,6 +18,8 @@ idf_component_register(
 # The "cockpit" settings namespace (brightness, layout API port). After
 # idf_component_register.
 espos_config_add_descriptor(config/cockpit.json)
+# The "screen_groups" namespace: which pages the tab strip shows per state.
+espos_config_add_descriptor(config/screen_groups.json)
 
 # The JPEG encoder's working buffers in PSRAM instead of internal RAM
 # (jpeg_psram.c says why). --undefined pulls the replacements in before the

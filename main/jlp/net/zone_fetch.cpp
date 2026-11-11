@@ -17,6 +17,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "../screen_groups.h"
 #include "../subject_registry.h"
 #include "../zone_registry.h"
 
@@ -39,16 +40,20 @@ struct MetaResult {
 };
 
 // A parsed value seed waiting to be applied on the UI task. The value is
-// extracted into a plain variant (number-or-bool) on the fetch side so the
-// UI side doesn't have to keep the source document around. String paths
-// are seeded from description() at build time, so they're never carried
-// here.
+// extracted into a plain variant (number, bool or text) on the fetch side
+// so the UI side doesn't have to keep the source document around. Text goes
+// to the page groups only: string subjects are seeded from description() at
+// build time.
 struct ValueResult {
   std::string path;
   int64_t requested_us = 0;  // esp_timer time the GET started
   bool is_float = false;
   float f = 0.0f;
   int i = 0;
+  bool is_str = false;  // a text value: for the page groups only
+  // The value as the stream would carry it: a string's text, else its
+  // JSON. The page groups match their states against it.
+  std::string s;
 };
 
 // Fetch + parse one path's meta. Appends a MetaResult to `out` if the
@@ -105,6 +110,11 @@ void fetch_value(const std::string& path, std::vector<ValueResult>* out) {
   ValueResult r;
   r.path = path;
   r.requested_us = requested_us;
+  if (v.is<const char*>()) {
+    r.s = v.as<const char*>();
+  } else {
+    serializeJson(v, r.s);
+  }
   // Check bool and int before float: ArduinoJson reports is<float>() true
   // for integers too, so testing float first would route an integer
   // reading through as<float>() and lose precision on large values.
@@ -118,11 +128,13 @@ void fetch_value(const std::string& path, std::vector<ValueResult>* out) {
     if (!std::isfinite(f)) return;
     r.is_float = true;
     r.f = f;
+  } else if (v.is<const char*>()) {
+    // Not for string subjects: they read description() at build time and
+    // the str_buf is owned by the stream listener (writing it here would
+    // race). Only the page groups take it.
+    r.is_str = true;
   } else {
-    // String / object values aren't seeded — string subjects read
-    // description() at build time and the str_buf is owned by the stream
-    // listener (writing it here would race).
-    return;
+    return;  // an object
   }
   out->push_back(std::move(r));
 }
@@ -151,6 +163,10 @@ void fetch_task(void* arg) {
       zones().apply_meta(m.path, m.doc.as<JsonObjectConst>());
     }
     for (auto& vr : *values) {
+      // Ignored unless it is the page groups' state path, which may also
+      // be a number.
+      screen_groups().seed(vr.path, vr.s, vr.requested_us);
+      if (vr.is_str) continue;
       auto kind = registry().kind_of(vr.path);
       if (!kind) continue;  // path not bound by any widget
       // A stream delta received after this GET started may be newer than

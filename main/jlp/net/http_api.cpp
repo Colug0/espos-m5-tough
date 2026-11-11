@@ -835,16 +835,20 @@ esp_err_t hello_get(httpd_req_t* req) {
   // /hello must answer even if the UI task is briefly backed up.
   {
     auto active = std::make_shared<std::string>();
+    auto group = std::make_shared<std::string>();
     auto ids = std::make_shared<std::vector<std::string>>();
     auto hop = std::make_shared<UiHop>();
     if (hop->sem) {
-      tough_hal::ui::post([active, ids, hop]() {
+      tough_hal::ui::post([active, group, ids, hop]() {
         *active = layout_manager().active_screen();
+        *group = layout_manager().active_group_name();
         *ids = layout_manager().screen_ids();
         xSemaphoreGive(hop->sem);
       });
       if (xSemaphoreTake(hop->sem, pdMS_TO_TICKS(2000)) == pdTRUE) {
         resp["active_screen"] = *active;
+        // The page group shown (screen_groups settings); absent without.
+        if (!group->empty()) resp["active_group"] = *group;
         JsonArray arr = resp["screens"].to<JsonArray>();
         for (const auto& s : *ids) arr.add(s);
       }

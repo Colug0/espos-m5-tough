@@ -67,6 +67,27 @@ to the new layout at once and keeps it across restarts. If the display could
 not store it, its reply to the push carries the warning `layout rendered but
 not persisted` and the layout lasts only until the next restart.
 
+### Pages per boat state
+
+A layout with many pages can show a few at a time, for example three for
+under way and three at anchor. On the web UI, open **Page groups** and add
+one row per group:
+
+| name | states | pages |
+|---|---|---|
+| `SAIL` | `sailing,motoring` | `course,wind,depth` |
+| `ANCHOR` | `anchored,moored` | `anchor,battery,weather` |
+
+`pages` are the screen ids from the designer. The tab strip then shows the
+pages of one group, and a tab at its right end switches to the next group. A
+page that no row lists shows in every group. With **Follow the boat's state**
+on, the group follows `navigation.state` (or the path you set) once the
+state has selected another group for the hold time, 30 s by default. A group
+you pick by hand
+stays until the state selects another group. Signal K needs a source for
+`navigation.state`, such as a plugin that sets it from speed or the anchor
+alarm.
+
 ## Updates
 
 On the device's web UI, open the OTA page and use **From a URL** with the
