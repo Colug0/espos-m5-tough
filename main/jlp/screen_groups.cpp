@@ -126,7 +126,9 @@ void ScreenGroups::reload() {
   // The path only matters with a group to pick; unsubscribed otherwise,
   // since the subscription table is shared with the layout.
   const std::string want = groups_.empty() ? "" : path;
-  if (want != path_) {
+  // A failed subscription (the table is shared and bounded) is tried
+  // again on the next reload.
+  if (want != path_ || (!want.empty() && sub_ <= 0)) {
     if (sub_ > 0) espos_sk_unsubscribe(sub_);
     sub_ = 0;
     path_ = want;
@@ -134,6 +136,7 @@ void ScreenGroups::reload() {
     state_.clear();
     stream_rx_us_ = 0;
     seed_req_us_ = 0;
+    path_since_us_ = esp_timer_get_time();
     if (!path_.empty()) {
       sub_ = espos_sk_subscribe(path_.c_str(), 1000, on_update,
                                 reinterpret_cast<void*>(static_cast<uintptr_t>(gen_)));
@@ -164,7 +167,11 @@ void ScreenGroups::seed(const std::string& path, const std::string& value,
                         int64_t requested_us) {
   // Two fetches can overlap (the path changed away and back): the one
   // whose GET started later wins.
-  if (path != path_ || stream_rx_us_ > requested_us || seed_req_us_ > requested_us) return;
+  // A GET from before the path was (re)chosen answers an older choice.
+  if (path != path_ || requested_us < path_since_us_ || stream_rx_us_ > requested_us ||
+      seed_req_us_ > requested_us) {
+    return;
+  }
   seed_req_us_ = requested_us;
   ESP_LOGI(TAG, "%s is %s", path_.c_str(), value.c_str());
   state_ = value;
@@ -198,6 +205,13 @@ void ScreenGroups::on_state(const std::string& value) {
 
 void ScreenGroups::tick() {
   if (pending_ >= 0 && lv_tick_elaps(pending_since_) >= hold_ms_) commit(pending_);
+  // A subscription that failed at boot gets another go now and then.
+  if (!path_.empty() && sub_ <= 0 && ++retry_ticks_ >= 30) {
+    retry_ticks_ = 0;
+    sub_ = espos_sk_subscribe(path_.c_str(), 1000, on_update,
+                              reinterpret_cast<void*>(static_cast<uintptr_t>(gen_)));
+    if (sub_ > 0) ESP_LOGI(TAG, "subscribed %s", path_.c_str());
+  }
 }
 
 void ScreenGroups::commit(int g) {

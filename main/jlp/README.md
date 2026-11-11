@@ -10,8 +10,9 @@ in espos-p4-cockpit.
 
 Every file here comes from
 [espos-p4-cockpit](https://github.com/dirkwa/espos-p4-cockpit) `main/jlp/`
-at `c3eaeed` (Apache-2.0, Dirk Wahrheit), except `features.h`. Each file says
-so in its header. What changed for the M5Stack Tough:
+at `c3eaeed` (Apache-2.0, Dirk Wahrheit), except `features.h` and
+`screen_groups.*`, which are this repo's own. Each taken-over file says so in
+its header. What changed for the M5Stack Tough:
 
 | Change | Files |
 |---|---|
