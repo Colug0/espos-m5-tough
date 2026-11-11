@@ -5,6 +5,7 @@
 #include "layout_manager.h"
 
 #include <ArduinoJson.h>
+#include <algorithm>
 #include <optional>
 #include <set>
 #include <unordered_map>
@@ -57,7 +58,33 @@ struct ScreenSwitcherCtx {
   bool overlay = false;
   bool peeking = false;
   uint32_t peek_start = 0;
+  // Page groups resolved against `ids`, indexed like the configured
+  // groups: the page indices each shows, empty for a group this layout
+  // has none of. Empty when ungrouped.
+  std::vector<std::vector<int>> members;
+  std::vector<int> last;  // per group, the page shown last in it, -1 none
+  int group = -1;         // the group shown, -1 ungrouped
+  lv_obj_t* group_tab = nullptr;
 };
+
+static bool contains(const std::vector<int>& v, int i) {
+  return std::find(v.begin(), v.end(), i) != v.end();
+}
+
+static bool visible_in_group(const ScreenSwitcherCtx* ctx, int i) {
+  return ctx->group < 0 || contains(ctx->members[ctx->group], i);
+}
+
+// The next group after `from` that this layout can show; `from` itself
+// when it is the only one, -1 when there is none.
+static int next_usable_group(const ScreenSwitcherCtx* ctx, int from) {
+  const int n = (int)ctx->members.size();
+  for (int k = 1; k <= n; k++) {
+    const int g = ((from < 0 ? -1 : from) + k + n) % n;
+    if (!ctx->members[g].empty()) return g;
+  }
+  return -1;
+}
 
 // One per layout. Lives in heap, freed when the layout's root is
 // destroyed (event_cb on root).
@@ -78,10 +105,29 @@ static void switcher_show(ScreenSwitcherCtx* ctx, int idx) {
     }
   }
   ctx->active = idx;
+  if (ctx->group >= 0) ctx->last[ctx->group] = idx;
   // Stream widgets open/close their network stream with screen visibility —
   // a hidden screen must not keep pulling frames through the hosted link.
   for (size_t i = 0; i < ctx->screens.size(); i++) {
     stream_widgets_notify_visibility(ctx->screens[i], (int)i == idx);
+  }
+}
+
+// Hides the tabs of pages outside the shown group; the flex row spreads
+// the rest. The group tab names the group a tap brings.
+static void show_group_tabs(ScreenSwitcherCtx* ctx,
+                            const std::vector<ScreenGroup>& groups) {
+  for (size_t i = 0; i < ctx->tabs.size(); i++) {
+    lv_obj_set_hidden(ctx->tabs[i], !visible_in_group(ctx, (int)i));
+  }
+  if (ctx->group_tab == nullptr) return;
+  const int next = ctx->group < 0 ? -1 : next_usable_group(ctx, ctx->group);
+  const bool shown = next >= 0 && next != ctx->group &&
+                     next < (int)groups.size();
+  lv_obj_set_hidden(ctx->group_tab, !shown);
+  if (shown) {
+    lv_label_set_text(lv_obj_get_child(ctx->group_tab, 0),
+                      groups[next].name.c_str());
   }
 }
 
@@ -226,6 +272,32 @@ bool build_screens(lv_obj_t* root, JsonObjectConst doc, JsonArrayConst screens,
         LV_EVENT_CLICKED, nullptr);
 
     sctx->tabs.push_back(btn);
+  }
+
+  // The group tab, last in the row and as wide as its label. Hidden until
+  // page groups give it a group to switch to.
+  {
+    lv_obj_t* btn = lv_obj_create(strip);
+    lv_obj_set_size(btn, LV_SIZE_CONTENT, lv_pct(100));
+    lv_obj_set_style_bg_color(btn, lv_color_hex(kStripBgHex), LV_PART_MAIN);
+    lv_obj_set_style_border_color(btn, lv_color_hex(kTabActiveBgHex),
+                                  LV_PART_MAIN);
+    lv_obj_set_style_border_width(btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_radius(btn, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_ver(btn, 0, LV_PART_MAIN);
+    lv_obj_set_scrollable(btn, false);
+    lv_obj_t* lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, "");
+    lv_obj_set_style_text_color(lbl, lv_color_hex(kTabActiveBgHex),
+                                LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_center(lbl);
+    lv_obj_add_event_cb(
+        btn, [](lv_event_t*) { layout_manager().next_group(); },
+        LV_EVENT_CLICKED, nullptr);
+    lv_obj_set_hidden(btn, true);
+    sctx->group_tab = btn;
   }
 
   switcher_show(sctx, 0);
@@ -467,9 +539,15 @@ void LayoutManager::track_swipe() {
       // The widget under the finger gets PRESS_LOST instead of a click.
       end_press();
       // Left brings the next page, as on a phone, and the last page
-      // wraps to the first.
+      // wraps to the first. Pages outside the shown group are skipped.
       const int n = (int)ctx->screens.size();
-      switcher_show(ctx, (ctx->active + (dx < 0 ? 1 : -1) + n) % n);
+      const int step = dx < 0 ? 1 : -1;
+      int next = ctx->active;
+      for (int k = 0; k < n; k++) {
+        next = (next + step + n) % n;
+        if (visible_in_group(ctx, next)) break;
+      }
+      switcher_show(ctx, next);
       strip_peek(ctx, true);  // shows where the swipe landed
       done = true;
     } else if (press_at_edge_ && -dy >= kEdgeSwipeMin && -dy > LV_ABS(dx)) {
@@ -611,6 +689,7 @@ ApplyResult LayoutManager::apply(const std::string& json, ApplySource src) {
   lv_obj_set_hidden(staging, false);
   current_root_ = staging;
   if (old_root) lv_obj_delete(old_root);
+  resolve_groups();
 
   // Single-screen layouts have no switcher, so nothing else ever marks
   // their widgets visible. Multi-screen roots got switcher_show(0) during
@@ -658,28 +737,133 @@ ApplyResult LayoutManager::apply(const std::string& json, ApplySource src) {
   return r;
 }
 
+// The remote choice wins over a swipe still being tracked. When it changes
+// the page, a press on the layout ends too: the widget gets PRESS_LOST, not
+// a click, so a toggle on a page no longer shown cannot send a PUT. A tap on
+// the page that stays keeps its click, and a press on an overlay above the
+// layout (alert, wake) is left alone. A swipe that met its threshold has
+// ended its press already.
+void LayoutManager::change_page(int idx) {
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  if (!ctx) return;
+  cancel_swipe();
+  if (idx != ctx->active && press_on_layout_ && indev_ != nullptr &&
+      lv_indev_get_state(indev_) == LV_INDEV_STATE_PRESSED) {
+    end_press();
+  }
+  switcher_show(ctx, idx);
+}
+
 bool LayoutManager::select_screen(const std::string& id) {
   ScreenSwitcherCtx* ctx = switcher_of(current_root_);
   if (!ctx) return false;
   for (size_t i = 0; i < ctx->ids.size(); i++) {
     if (ctx->ids[i] == id) {
-      // The remote choice wins over a swipe still being tracked. When it
-      // changes the page, a press on the layout ends too: the widget gets
-      // PRESS_LOST, not a click, so a toggle on a page no longer shown
-      // cannot send a PUT. A tap on the page that stays keeps its click, and
-      // a press on an overlay above the layout (alert, wake) is left alone.
-      // A swipe that met its threshold has ended its press already.
-      cancel_swipe();
-      if ((int)i != ctx->active && press_on_layout_ && indev_ != nullptr &&
-          lv_indev_get_state(indev_) == LV_INDEV_STATE_PRESSED) {
-        end_press();
+      // A page of another group brings its group along.
+      if (!visible_in_group(ctx, (int)i)) {
+        for (size_t g = 0; g < ctx->members.size(); g++) {
+          if (contains(ctx->members[g], (int)i)) {
+            group_ = ctx->group = (int)g;
+            show_group_tabs(ctx, groups_);
+            break;
+          }
+        }
       }
-      switcher_show(ctx, (int)i);
+      change_page((int)i);
       strip_peek(ctx, false);  // as a tab tap does
       return true;
     }
   }
   return false;
+}
+
+void LayoutManager::set_groups(std::vector<ScreenGroup> groups) {
+  groups_ = std::move(groups);
+  if (group_ >= (int)groups_.size()) group_ = 0;
+  resolve_groups();
+}
+
+// Matches the configured groups to the current layout's pages and puts
+// the strip and the page in line with the chosen group.
+void LayoutManager::resolve_groups() {
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  if (!ctx) return;
+  const int n = (int)ctx->ids.size();
+  std::vector<bool> listed(n, false);
+  std::vector<std::vector<int>> own(groups_.size());
+  for (size_t g = 0; g < groups_.size(); g++) {
+    for (int i = 0; i < n; i++) {
+      const auto& p = groups_[g].pages;
+      if (std::find(p.begin(), p.end(), ctx->ids[i]) != p.end()) {
+        own[g].push_back(i);
+        listed[i] = true;
+      }
+    }
+  }
+  ctx->members.assign(groups_.size(), {});
+  bool any = false;
+  for (size_t g = 0; g < groups_.size(); g++) {
+    if (own[g].empty()) continue;  // the layout has none of its pages
+    any = true;
+    // Its own pages and the unlisted ones, in tab order.
+    for (int i = 0; i < n; i++) {
+      if (!listed[i] || contains(own[g], i)) ctx->members[g].push_back(i);
+    }
+  }
+  if (!any) ctx->members.clear();
+  ctx->last.assign(ctx->members.size(), -1);
+  if (ctx->members.empty()) {
+    ctx->group = -1;
+  } else if (group_ < (int)ctx->members.size() &&
+             !ctx->members[group_].empty()) {
+    ctx->group = group_;
+  } else {
+    ctx->group = next_usable_group(ctx, -1);
+  }
+  show_group_tabs(ctx, groups_);
+  if (!visible_in_group(ctx, ctx->active)) {
+    change_page(ctx->members[ctx->group].front());
+  } else if (ctx->group >= 0) {
+    ctx->last[ctx->group] = ctx->active;
+  }
+}
+
+bool LayoutManager::select_group(int g) {
+  if (g < 0 || g >= (int)groups_.size()) return false;
+  group_ = g;
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  if (!ctx || g >= (int)ctx->members.size() || ctx->members[g].empty()) {
+    return false;
+  }
+  if (ctx->group == g) return true;
+  ctx->group = g;
+  show_group_tabs(ctx, groups_);
+  // Back to where the crew was in that group; the first time, a page the
+  // two groups share stays, else the group's first page.
+  int page = ctx->last[g];
+  if (page < 0) {
+    page = visible_in_group(ctx, ctx->active) ? ctx->active
+                                              : ctx->members[g].front();
+  }
+  change_page(page);
+  return true;
+}
+
+void LayoutManager::next_group() {
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  if (!ctx || ctx->group < 0) return;
+  const int g = next_usable_group(ctx, ctx->group);
+  if (g < 0 || g == ctx->group) return;
+  ESP_LOGI(TAG, "group %s by hand", groups_[g].name.c_str());
+  select_group(g);
+  // The strip stays up to pick a page of the new group.
+  if (ctx->peeking) ctx->peek_start = lv_tick_get();
+}
+
+std::string LayoutManager::active_group_name() const {
+  ScreenSwitcherCtx* ctx = switcher_of(current_root_);
+  if (!ctx || ctx->group < 0 || ctx->group >= (int)groups_.size()) return "";
+  return groups_[ctx->group].name;
 }
 
 std::string LayoutManager::active_screen() const {

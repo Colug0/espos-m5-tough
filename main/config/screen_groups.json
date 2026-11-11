@@ -1,0 +1,41 @@
+{
+  "namespace": "screen_groups",
+  "version": 1,
+  "title": "Page groups",
+  "description": "Groups of a multi-page layout's pages. The tab strip and page swipes show the pages of one group; a tab at the right end of the strip switches to the next group. A page that no group lists is shown in every group. Pages are named by their screen id in the layout. Without groups the strip shows every page.",
+  "keys": [
+    {
+      "name": "groups",
+      "type": "string",
+      "default": "[]",
+      "title": "Groups",
+      "description": "One row per group. name: the label of its tab, a few letters. states: values of the state path that select it, comma-separated (sailing,motoring). pages: screen ids, comma-separated (course,wind,depth).",
+      "x": {"format": "table", "columns": ["name", "states", "pages"]}
+    },
+    {
+      "name": "auto",
+      "type": "bool",
+      "default": true,
+      "title": "Follow the boat's state",
+      "description": "Switch the group when the state path changes to a value a group lists. A group chosen by hand stays until the state changes again. Off: groups change by hand only."
+    },
+    {
+      "name": "path",
+      "type": "string",
+      "default": "navigation.state",
+      "maxLength": 96,
+      "title": "State path",
+      "description": "Signal K path whose value selects the group."
+    },
+    {
+      "name": "hold_s",
+      "type": "int",
+      "default": 30,
+      "min": 0,
+      "max": 600,
+      "unit": "s",
+      "title": "Hold time",
+      "description": "How long a new state must stay before the group follows it, so a state that flickers does not flip the pages. The first state after a restart switches at once."
+    }
+  ]
+}

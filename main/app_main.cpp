@@ -43,6 +43,7 @@
 #include "jlp/net/zone_fetch.h"
 #include "jlp/notifications_registry.h"
 #include "jlp/status_overlay.h"
+#include "jlp/screen_groups.h"
 #include "jlp/sun_state.h"
 #include "jlp/wake_overlay.h"
 #include "jlp/zone_registry.h"
@@ -89,7 +90,10 @@ void sk_stream_up() {
   // the restored layout binds, then look for a layout in applicationData.
   if (!s_boot_fetch_done) {
     s_boot_fetch_done = true;
-    const auto& boot_paths = jlp::layout_manager().known_paths();
+    // The page groups' state path rides along: it is set rarely, and the
+    // stream sends only changes.
+    std::set<std::string> boot_paths = jlp::layout_manager().known_paths();
+    if (!jlp::screen_groups().path().empty()) boot_paths.insert(jlp::screen_groups().path());
     if (!boot_paths.empty()) {
       jlp::zone_fetch_for_paths(std::vector<std::string>(boot_paths.begin(), boot_paths.end()));
     }
@@ -203,6 +207,7 @@ void player_up() {
   jlp::zones().hook_sk_ws();
   jlp::notifications().hook_sk_ws();
   jlp::sun_state().hook_sk_ws();
+  jlp::screen_groups().init();  // after the boot layout: it picks a page
   jlp::alert_overlay().init();
   jlp::wake_overlay().init();  // after alert_overlay: z-order
   jlp::idle_dimmer().init();
@@ -248,6 +253,12 @@ esp_err_t board_up(void*) {
   // change is posted to the UI task.
   espos_config_subscribe(
       [](const char* ns, const char* key, void*) {
+        // One subscriber for both namespaces: the change feed has 8 slots,
+        // and espOS takes most of them.
+        if (strcmp(ns, ESPOS_CFG_NS_SCREEN_GROUPS) == 0) {
+          ui::post([] { jlp::screen_groups().reload(); });
+          return;
+        }
         if (strcmp(ns, ESPOS_CFG_NS_COCKPIT) != 0) return;
         if (strcmp(key, ESPOS_CFG_COCKPIT_STATUS_PEEK_S) == 0) {
           int32_t s = 5;

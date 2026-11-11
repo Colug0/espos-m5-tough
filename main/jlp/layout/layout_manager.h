@@ -21,6 +21,15 @@ inline constexpr const char* kTabStripModes[] = {kTabStripFixed,
 
 enum class ApplySource { Boot, BootStore, BootDefault, PostLayout, BootFetched };
 
+// A set of pages the tab strip shows together (screen_groups settings).
+// `pages` are screen ids; `states` are the values of the state path that
+// select the group.
+struct ScreenGroup {
+  std::string name;
+  std::vector<std::string> states;
+  std::vector<std::string> pages;
+};
+
 struct ApplyResult {
   bool ok;
   std::string err;
@@ -76,6 +85,23 @@ class LayoutManager {
   // single-screen.
   std::vector<std::string> screen_ids() const;
 
+  // Page groups. The strip and page swipes then show the pages of one
+  // group plus the pages no group lists; a tab at the strip's right end
+  // switches to the next group. A group none of whose pages the layout
+  // has is skipped. Kept across layout pushes. UI TASK ONLY.
+  void set_groups(std::vector<ScreenGroup> groups);
+
+  // Shows group `g` (index into set_groups) on the page last shown in it.
+  // Remembered for the next layout if this one lacks the group. False if
+  // the layout cannot show it. UI TASK ONLY.
+  bool select_group(int g);
+
+  // Name of the group shown; empty when the layout is ungrouped.
+  std::string active_group_name() const;
+
+  // The group tab's tap: the next group the layout can show.
+  void next_group();
+
   // How long an overlay tab strip stays up after a swipe without a tap.
   void set_tab_peek_seconds(uint32_t seconds) { tab_peek_ms_ = seconds * 1000u; }
 
@@ -91,6 +117,9 @@ class LayoutManager {
   void track_swipe();
   void cancel_swipe();
   void end_press();
+  // A page change that did not come from the finger on the layout.
+  void change_page(int idx);
+  void resolve_groups();
 
   lv_obj_t* parent_ = nullptr;
   lv_indev_t* indev_ = nullptr;
@@ -104,6 +133,8 @@ class LayoutManager {
   std::string active_name_;
   ApplySource active_source_ = ApplySource::Boot;
   PostSwapHook post_swap_;
+  std::vector<ScreenGroup> groups_;
+  int group_ = 0;  // index into groups_ chosen last, by hand or by state
   // Paths the currently-applied layout binds. Used to detect whether
   // the next swap introduces brand-new paths, whose values the post-swap
   // hook seeds via REST.
