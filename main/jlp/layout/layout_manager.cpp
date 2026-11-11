@@ -782,32 +782,45 @@ bool LayoutManager::select_screen(const std::string& id) {
   return false;
 }
 
+// Where an old group is in a new list: at the same row if that row has its
+// name, else the first row with its name, -1 if none. Names may repeat, so
+// a row that kept its place wins over one further up with the same name.
+static int find_group(const std::vector<ScreenGroup>& groups, size_t old_row,
+                      const std::string& name) {
+  if (old_row < groups.size() && groups[old_row].name == name) return (int)old_row;
+  for (size_t g = 0; g < groups.size(); g++) {
+    if (groups[g].name == name) return (int)g;
+  }
+  return -1;
+}
+
 void LayoutManager::set_groups(std::vector<ScreenGroup> groups) {
-  // A reload must not move the crew: the chosen group is found again by
-  // its name, and each group's last page by its id, so reordering rows or
+  // A reload must not move the crew: the chosen group and each group's last
+  // page are found again (find_group, page by id), so reordering rows or
   // changing an unrelated setting keeps both.
   ScreenSwitcherCtx* ctx = switcher_of(current_root_);
-  std::string chosen;
-  if (group_ >= 0 && group_ < (int)groups_.size()) chosen = groups_[group_].name;
-  std::vector<std::pair<std::string, std::string>> last;  // group name, page id
+  std::vector<std::string> old_names;
+  for (const auto& g : groups_) old_names.push_back(g.name);
+  std::vector<std::pair<size_t, std::string>> last;  // old row, page id
   if (ctx) {
     for (size_t g = 0; g < ctx->last.size() && g < groups_.size(); g++) {
-      if (ctx->last[g] >= 0) last.emplace_back(groups_[g].name, ctx->ids[ctx->last[g]]);
+      if (ctx->last[g] >= 0) last.emplace_back(g, ctx->ids[ctx->last[g]]);
     }
   }
+  const int old_group = group_;
   groups_ = std::move(groups);
   group_ = 0;
-  for (size_t g = 0; g < groups_.size(); g++) {
-    if (groups_[g].name == chosen) group_ = (int)g;
+  if (old_group >= 0 && old_group < (int)old_names.size()) {
+    const int g = find_group(groups_, old_group, old_names[old_group]);
+    if (g >= 0) group_ = g;
   }
   resolve_groups();
   if (!ctx || ctx->members.empty()) return;
-  for (const auto& [name, id] : last) {
-    for (size_t g = 0; g < groups_.size(); g++) {
-      if (groups_[g].name != name) continue;
-      for (int i : ctx->members[g]) {
-        if (ctx->ids[i] == id) ctx->last[g] = i;
-      }
+  for (const auto& [row, id] : last) {
+    const int g = find_group(groups_, row, old_names[row]);
+    if (g < 0) continue;
+    for (int i : ctx->members[g]) {
+      if (ctx->ids[i] == id) ctx->last[g] = i;
     }
   }
   if (ctx->group >= 0) ctx->last[ctx->group] = ctx->active;
