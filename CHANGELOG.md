@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1 (2026-11-12)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(layout): give the group tab label a width by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/42
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.6.0...v0.6.1
+
 ## 0.6.0 (2026-11-11)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
