@@ -274,14 +274,15 @@ bool build_screens(lv_obj_t* root, JsonObjectConst doc, JsonArrayConst screens,
     sctx->tabs.push_back(btn);
   }
 
-  // The group tab, last in the row and as wide as its label up to a third
-  // of the strip, so a long group name cannot squeeze the page tabs; a
-  // longer name ends in dots. Hidden until page groups give it a group to
+  // The group tab, last in the row and as wide as its label up to about a
+  // third of the strip, so a long group name cannot squeeze the page tabs;
+  // a longer name ends in dots. The label's limit is in pixels: a
+  // percentage of the content-sized tab resolves against zero and shrank
+  // the label to nothing. Hidden until page groups give it a group to
   // switch to.
   {
     lv_obj_t* btn = lv_obj_create(strip);
     lv_obj_set_size(btn, LV_SIZE_CONTENT, lv_pct(100));
-    lv_obj_set_style_max_width(btn, lv_pct(33), LV_PART_MAIN);
     lv_obj_set_style_bg_color(btn, lv_color_hex(kStripBgHex), LV_PART_MAIN);
     lv_obj_set_style_border_color(btn, lv_color_hex(kTabActiveBgHex),
                                   LV_PART_MAIN);
@@ -293,7 +294,9 @@ bool build_screens(lv_obj_t* root, JsonObjectConst doc, JsonArrayConst screens,
     lv_obj_t* lbl = lv_label_create(btn);
     lv_label_set_text(lbl, "");
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_style_max_width(lbl, lv_pct(100), LV_PART_MAIN);
+    // One line, so a long name ends in dots instead of wrapping.
+    lv_obj_set_height(lbl, lv_font_get_line_height(&lv_font_montserrat_20));
+    lv_obj_set_style_max_width(lbl, LV_HOR_RES / 3 - 20, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl, lv_color_hex(kTabActiveBgHex),
                                 LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
