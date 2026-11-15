@@ -106,7 +106,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: write
-    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@1db691fac1eb8c618430ea1d75215f3d093775cc # v0.26.1
+    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@3ee0d0f2ae8057c374aeddd7968e4af916745a22 # v0.29.0
     with:
       name: m5-tough
       builds: '[{"target": "esp32"}]'
