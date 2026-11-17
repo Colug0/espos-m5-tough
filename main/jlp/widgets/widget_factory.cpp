@@ -3,6 +3,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* From espos-p4-cockpit main/jlp/widgets/widget_factory.cpp, changed for the M5Stack Tough (main/jlp/README.md). */
 #include "widget_factory.h"
+#include "../layout/layout_manager.h"
 
 #include <math.h>
 
@@ -1813,6 +1814,11 @@ lv_obj_t* build_bargroup(BuildCtx& ctx, JsonObjectConst spec,
 //   - RELEASED fires put(release_value) if release_value is set AND
 //     the press already fired. Releasing during a pending hold
 //     cancels the press timer with no PUT (intended).
+//   - On a multi-screen layout a hold_ms == 0 button waits
+//     kButtonSettleMs before its press PUT, so a page or edge swipe
+//     that starts on it takes the press (PRESS_LOST) before anything is
+//     sent: a horn or windlass must not sound for a swipe. A tap shorter
+//     than that sends press_value and release_value on release.
 //
 // Value typing: press_value / release_value can be a bool, integer,
 // float, or string in the JSON spec. We route to the matching put_*
@@ -1845,7 +1851,12 @@ struct ButtonCtx {
   lv_timer_t* hold_timer;    // pending press; nullptr otherwise
   lv_obj_t* root;            // for redraw on press/release state
   bool press_fired;
+  bool settling = false;     // hold_timer is the swipe settle, not a hold
 };
+
+// Long enough for the swipe tracker (20 ms polls, 40 px) to take a quick
+// swipe, short enough not to feel late on a momentary button.
+constexpr uint32_t kButtonSettleMs = 100;
 
 void button_fire(const std::string& path, const std::string& json,
                  bool is_press) {
@@ -1936,22 +1947,27 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
         c->press_fired = false;
         // Visual press feedback: dim the tile slightly.
         lv_obj_set_style_bg_opa(c->root, LV_OPA_70, LV_PART_MAIN);
-        if (c->hold_ms == 0) {
+        if (c->hold_timer) {
+          lv_timer_delete(c->hold_timer);
+          c->hold_timer = nullptr;
+        }
+        c->settling = c->hold_ms == 0 && layout_manager().multi_screen();
+        if (c->hold_ms == 0 && !c->settling) {
           button_fire(c->path, c->press_json, true);
           c->press_fired = true;
           return;
         }
-        // Hold-to-act: wait, then PUT.
-        if (c->hold_timer) lv_timer_delete(c->hold_timer);
+        // Hold-to-act, or the swipe settle: wait, then PUT.
         c->hold_timer = lv_timer_create(
             [](lv_timer_t* t) {
               auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
               button_fire(c->path, c->press_json, true);
               c->press_fired = true;
+              c->settling = false;
               lv_timer_delete(t);
               c->hold_timer = nullptr;
             },
-            c->hold_ms, c);
+            c->settling ? kButtonSettleMs : c->hold_ms, c);
         lv_timer_set_repeat_count(c->hold_timer, 1);
       },
       LV_EVENT_PRESSED, bctx);
@@ -1963,9 +1979,17 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
     auto* c = static_cast<ButtonCtx*>(lv_event_get_user_data(e));
     lv_obj_set_style_bg_opa(c->root, LV_OPA_COVER, LV_PART_MAIN);
     if (c->hold_timer) {
-      // Released before hold expired: cancel, no PUT.
+      // Released before the hold expired: cancel, no PUT. A tap within the
+      // swipe settle still acts, press then release; if the press is lost,
+      // a swipe took it, and nothing is sent.
       lv_timer_delete(c->hold_timer);
       c->hold_timer = nullptr;
+      const bool tap = c->settling && lv_event_get_code(e) == LV_EVENT_RELEASED;
+      c->settling = false;
+      if (tap) {
+        button_fire(c->path, c->press_json, true);
+        button_fire(c->path, c->release_json, false);
+      }
       return;
     }
     if (c->press_fired) {
