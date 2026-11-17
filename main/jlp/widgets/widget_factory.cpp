@@ -1908,8 +1908,10 @@ void button_settle_tick(lv_timer_t* t) {
 }
 
 void button_hold_done(lv_timer_t* t) {
-  button_end_timer(static_cast<ButtonCtx*>(lv_timer_get_user_data(t)));
-  button_commit(static_cast<ButtonCtx*>(lv_timer_get_user_data(t)));
+  // Read before the delete: lv_timer_delete frees t at once.
+  auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
+  button_end_timer(c);
+  button_commit(c);
 }
 
 void button_fire(const std::string& path, const std::string& json,
