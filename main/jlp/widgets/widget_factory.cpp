@@ -3,7 +3,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* From espos-p4-cockpit main/jlp/widgets/widget_factory.cpp, changed for the M5Stack Tough (main/jlp/README.md). */
 #include "widget_factory.h"
-#include "../layout/layout_manager.h"
 
 #include <math.h>
 
@@ -1814,16 +1813,6 @@ lv_obj_t* build_bargroup(BuildCtx& ctx, JsonObjectConst spec,
 //   - RELEASED fires put(release_value) if release_value is set AND
 //     the press already fired. Releasing during a pending hold
 //     cancels the press timer with no PUT (intended).
-//   - On a multi-screen layout a hold_ms == 0 button sends its press
-//     PUT kButtonSettleMs after the touch if the finger has stayed within
-//     kButtonSlopPx of where it came down. A finger that leaves that spot
-//     is swiping or sliding, not pressing: the button sends nothing for
-//     that touch, neither on hold nor on release, so a horn or windlass
-//     does not sound for a page or edge swipe that starts on it. A tap
-//     released within the slop before the settle ends sends press_value
-//     and release_value on release.
-//   - Once a button has sent its press, the press is its own: the same
-//     touch no longer turns the page (LayoutManager::claim_press).
 //
 // Value typing: press_value / release_value can be a bool, integer,
 // float, or string in the JSON spec. We route to the matching put_*
@@ -1856,51 +1845,7 @@ struct ButtonCtx {
   lv_timer_t* hold_timer;    // pending press; nullptr otherwise
   lv_obj_t* root;            // for redraw on press/release state
   bool press_fired;
-  bool settling = false;     // in the swipe settle, nothing sent yet
-  lv_point_t touch_pt{};     // where the finger came down
-  uint32_t touch_ms = 0;     // when, lv_tick
 };
-
-// Long enough for the swipe tracker (20 ms polls, 40 px) to take a quick
-// swipe, short enough not to feel late on a momentary button. The slop is
-// what a resting fingertip wanders; past it the touch is a swipe or slide.
-// The settle is decided on PRESSING, which LVGL sends on every input read
-// while the finger is down, with that read's position: a timer could see
-// the sample of the read before.
-constexpr uint32_t kButtonSettleMs = 100;
-constexpr int32_t kButtonSlopPx = 10;
-
-void button_fire(const std::string& path, const std::string& json, bool is_press);
-
-// Whether the finger is further than the slop from where it came down. An
-// unknown position counts as moved, so a doubt never sends.
-bool beyond_slop(const ButtonCtx* c, lv_indev_t* indev) {
-  if (indev == nullptr) return true;
-  lv_point_t p{};
-  lv_indev_get_point(indev, &p);
-  return LV_ABS(p.x - c->touch_pt.x) > kButtonSlopPx ||
-         LV_ABS(p.y - c->touch_pt.y) > kButtonSlopPx;
-}
-
-// Sends the press and keeps the touch for the button.
-void button_commit(ButtonCtx* c) {
-  button_fire(c->path, c->press_json, true);
-  c->press_fired = true;
-  c->settling = false;
-  layout_manager().claim_press();
-}
-
-void button_end_timer(ButtonCtx* c) {
-  if (c->hold_timer) lv_timer_delete(c->hold_timer);
-  c->hold_timer = nullptr;
-}
-
-void button_hold_done(lv_timer_t* t) {
-  // Read before the delete: lv_timer_delete frees t at once.
-  auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
-  button_end_timer(c);
-  button_commit(c);
-}
 
 void button_fire(const std::string& path, const std::string& json,
                  bool is_press) {
@@ -1971,6 +1916,9 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
   lv_label_set_text(lbl, caption);
   lv_obj_center(lbl);
 
+  // Sent on touch-down, a press must not also turn the page.
+  if (hold_ms == 0) mark_press_keeper(root);
+
   auto* bctx = new ButtonCtx{path, press_json, release_json, hold_ms,
                              nullptr, root, false};
   lv_obj_set_user_data(root, bctx);
@@ -1991,40 +1939,25 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
         c->press_fired = false;
         // Visual press feedback: dim the tile slightly.
         lv_obj_set_style_bg_opa(c->root, LV_OPA_70, LV_PART_MAIN);
-        if (c->hold_timer) {
-          lv_timer_delete(c->hold_timer);
-          c->hold_timer = nullptr;
-        }
-        c->settling = c->hold_ms == 0 && layout_manager().multi_screen();
-        if (c->hold_ms == 0 && !c->settling) {
+        if (c->hold_ms == 0) {
           button_fire(c->path, c->press_json, true);
           c->press_fired = true;
           return;
         }
-        if (lv_indev_t* indev = lv_indev_active()) {
-          lv_indev_get_point(indev, &c->touch_pt);
-        }
-        c->touch_ms = lv_tick_get();
-        if (c->settling) return;  // decided on PRESSING
         // Hold-to-act: wait, then PUT.
-        c->hold_timer = lv_timer_create(button_hold_done, c->hold_ms, c);
+        if (c->hold_timer) lv_timer_delete(c->hold_timer);
+        c->hold_timer = lv_timer_create(
+            [](lv_timer_t* t) {
+              auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
+              button_fire(c->path, c->press_json, true);
+              c->press_fired = true;
+              lv_timer_delete(t);
+              c->hold_timer = nullptr;
+            },
+            c->hold_ms, c);
         lv_timer_set_repeat_count(c->hold_timer, 1);
       },
       LV_EVENT_PRESSED, bctx);
-
-  // The swipe settle, on each input read while the finger is down.
-  lv_obj_add_event_cb(
-      root,
-      [](lv_event_t* e) {
-        auto* c = static_cast<ButtonCtx*>(lv_event_get_user_data(e));
-        if (!c->settling) return;
-        if (beyond_slop(c, lv_indev_active())) {
-          c->settling = false;  // a swipe or a slide: this touch sends nothing
-          return;
-        }
-        if (lv_tick_elaps(c->touch_ms) >= kButtonSettleMs) button_commit(c);
-      },
-      LV_EVENT_PRESSING, bctx);
 
   // PRESS_LOST ends the press like RELEASED: the finger slid off, or a
   // page swipe took the press. A press already sent gets its release,
@@ -2032,22 +1965,10 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
   auto release_cb = [](lv_event_t* e) {
     auto* c = static_cast<ButtonCtx*>(lv_event_get_user_data(e));
     lv_obj_set_style_bg_opa(c->root, LV_OPA_COVER, LV_PART_MAIN);
-    if (c->settling) {
-      // A tap within the swipe settle still acts, press then release, if
-      // the finger lifts within the slop; a press that is lost, or a lift
-      // away from the touch-down point, was a swipe, and nothing is sent.
-      const bool tap = lv_event_get_code(e) == LV_EVENT_RELEASED &&
-                       !beyond_slop(c, lv_indev_active());
-      c->settling = false;
-      if (tap) {
-        button_fire(c->path, c->press_json, true);
-        button_fire(c->path, c->release_json, false);
-      }
-      return;
-    }
     if (c->hold_timer) {
-      // Released before the hold expired: cancel, no PUT.
-      button_end_timer(c);
+      // Released before hold expired: cancel, no PUT.
+      lv_timer_delete(c->hold_timer);
+      c->hold_timer = nullptr;
       return;
     }
     if (c->press_fired) {

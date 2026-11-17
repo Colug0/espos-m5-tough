@@ -459,12 +459,13 @@ static bool inside(lv_obj_t* obj, lv_obj_t* root) {
 // A drag on a slider or arc moves it; it must not also turn the page. The
 // same holds for an image, which only the stream widget creates: it
 // forwards the drag to the remote browser, and its release would be lost
-// with the page.
+// with the page. And for a momentary button: it sent its press on
+// touch-down, and a swipe would turn the page under it.
 static bool drags(lv_obj_t* obj, lv_obj_t* root) {
   for (lv_obj_t* o = obj; o != nullptr && o != root; o = lv_obj_get_parent(o)) {
     if (lv_obj_check_type(o, &lv_slider_class) ||
         lv_obj_check_type(o, &lv_arc_class) ||
-        lv_obj_check_type(o, &lv_image_class)) {
+        lv_obj_check_type(o, &lv_image_class) || is_press_keeper(o)) {
       return true;
     }
   }
@@ -924,10 +925,6 @@ std::string LayoutManager::active_screen() const {
   if (!ctx) return "";
   if (ctx->active < 0 || ctx->active >= (int)ctx->ids.size()) return "";
   return ctx->ids[ctx->active];
-}
-
-bool LayoutManager::multi_screen() const {
-  return switcher_of(current_root_) != nullptr;
 }
 
 std::vector<std::string> LayoutManager::screen_ids() const {

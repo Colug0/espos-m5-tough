@@ -85,14 +85,6 @@ class LayoutManager {
   // single-screen.
   std::vector<std::string> screen_ids() const;
 
-  // Whether the active layout has more than one screen, and so page
-  // swipes. UI TASK ONLY.
-  bool multi_screen() const;
-
-  // A widget that has acted on the current press keeps it: the press no
-  // longer turns the page or shows the strip. UI TASK ONLY.
-  void claim_press() { cancel_swipe(); }
-
   // Page groups. The strip and page swipes then show the pages of one
   // group plus the pages no group lists; a tab at the strip's right end
   // switches to the next group. A group none of whose pages the layout
