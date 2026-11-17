@@ -1814,11 +1814,15 @@ lv_obj_t* build_bargroup(BuildCtx& ctx, JsonObjectConst spec,
 //   - RELEASED fires put(release_value) if release_value is set AND
 //     the press already fired. Releasing during a pending hold
 //     cancels the press timer with no PUT (intended).
-//   - On a multi-screen layout a hold_ms == 0 button waits
-//     kButtonSettleMs before its press PUT, so a page or edge swipe
-//     that starts on it takes the press (PRESS_LOST) before anything is
-//     sent: a horn or windlass must not sound for a swipe. A tap shorter
-//     than that sends press_value and release_value on release.
+//   - On a multi-screen layout a hold_ms == 0 button sends its press
+//     PUT once the finger has rested on it: kButtonSettleMs after the
+//     touch, and later while the finger still moves more than
+//     kButtonSlopPx between polls. A page or edge swipe that starts on it
+//     takes the press (PRESS_LOST) before anything is sent: a horn or
+//     windlass must not sound for a swipe. A tap released before that
+//     sends press_value and release_value on release.
+//   - Once a button has sent its press, the press is its own: the same
+//     touch no longer turns the page (LayoutManager::claim_press).
 //
 // Value typing: press_value / release_value can be a bool, integer,
 // float, or string in the JSON spec. We route to the matching put_*
@@ -1852,11 +1856,50 @@ struct ButtonCtx {
   lv_obj_t* root;            // for redraw on press/release state
   bool press_fired;
   bool settling = false;     // hold_timer is the swipe settle, not a hold
+  lv_point_t settle_pt{};    // finger at the last settle check
 };
 
 // Long enough for the swipe tracker (20 ms polls, 40 px) to take a quick
-// swipe, short enough not to feel late on a momentary button.
+// swipe, short enough not to feel late on a momentary button. A finger
+// still moving after it is checked again every poll; a resting finger
+// moves less than the slop between two.
 constexpr uint32_t kButtonSettleMs = 100;
+constexpr uint32_t kButtonSettlePollMs = 20;
+constexpr int32_t kButtonSlopPx = 8;
+
+void button_fire(const std::string& path, const std::string& json, bool is_press);
+void button_settle_or_fire(lv_timer_t* t);
+
+// Sends the press and keeps the touch for the button.
+void button_commit(ButtonCtx* c) {
+  button_fire(c->path, c->press_json, true);
+  c->press_fired = true;
+  c->settling = false;
+  layout_manager().claim_press();
+}
+
+void button_settle_or_fire(lv_timer_t* t) {
+  auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
+  lv_timer_delete(t);
+  c->hold_timer = nullptr;
+  if (c->settling) {
+    // Outside input processing lv_indev_active() is NULL; the panel has
+    // one pointer device.
+    lv_indev_t* indev = lv_indev_get_next(nullptr);
+    lv_point_t p = c->settle_pt;
+    if (indev != nullptr) lv_indev_get_point(indev, &p);
+    const bool moving = LV_ABS(p.x - c->settle_pt.x) > kButtonSlopPx ||
+                        LV_ABS(p.y - c->settle_pt.y) > kButtonSlopPx;
+    c->settle_pt = p;
+    if (moving) {
+      c->hold_timer = lv_timer_create(button_settle_or_fire,
+                                      kButtonSettlePollMs, c);
+      lv_timer_set_repeat_count(c->hold_timer, 1);
+      return;
+    }
+  }
+  button_commit(c);
+}
 
 void button_fire(const std::string& path, const std::string& json,
                  bool is_press) {
@@ -1957,16 +2000,12 @@ lv_obj_t* build_button(BuildCtx& ctx, JsonObjectConst spec, std::string* err) {
           c->press_fired = true;
           return;
         }
+        if (lv_indev_t* indev = lv_indev_active()) {
+          lv_indev_get_point(indev, &c->settle_pt);
+        }
         // Hold-to-act, or the swipe settle: wait, then PUT.
         c->hold_timer = lv_timer_create(
-            [](lv_timer_t* t) {
-              auto* c = static_cast<ButtonCtx*>(lv_timer_get_user_data(t));
-              button_fire(c->path, c->press_json, true);
-              c->press_fired = true;
-              c->settling = false;
-              lv_timer_delete(t);
-              c->hold_timer = nullptr;
-            },
+            button_settle_or_fire,
             c->settling ? kButtonSettleMs : c->hold_ms, c);
         lv_timer_set_repeat_count(c->hold_timer, 1);
       },
