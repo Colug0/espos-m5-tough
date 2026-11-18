@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.2 (2026-11-18)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(layout): keep swipes from pressing buttons by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/48
+### Other
+* fix: bump espOS to v0.29.2 by @github-actions[bot] in https://github.com/Colug0/espos-m5-tough/pull/47
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.6.1...v0.6.2
+
 ## 0.6.1 (2026-11-12)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
