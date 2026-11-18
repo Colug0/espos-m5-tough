@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.3 (2026-11-18)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Fixed
+* fix(jlp): fix switch state and seed races by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/51
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.6.2...v0.6.3
+
 ## 0.6.2 (2026-11-18)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
