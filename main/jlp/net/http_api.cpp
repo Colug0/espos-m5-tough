@@ -34,6 +34,7 @@
 
 #include "../layout/layout_manager.h"
 #include "../layout/store.h"
+#include "../widgets/widget_factory.h"
 #include "../audio/chime.h"
 #if JLP_VOICE
 #include "../audio/voice_control.h"
@@ -883,6 +884,8 @@ esp_err_t hello_get(httpd_req_t* req) {
   display["idle_dim_pct"] = true;
   JsonArray tab_strip = display["tab_strip"].to<JsonArray>();
   for (const char* mode : kTabStripModes) tab_strip.add(mode);
+  jlp::font_sizes(display["font_sizes"].to<JsonArray>(),
+                  display["digit_font_sizes"].to<JsonArray>());
   resp["widgets"] = serialized(kWidgetCatalogJson);
   resp["screenshot"]["formats"] = serialized("[\"jpeg\",\"bmp\"]");
   resp["active_layout_name"] = name;

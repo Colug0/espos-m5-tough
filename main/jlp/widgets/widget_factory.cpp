@@ -106,32 +106,37 @@ void apply_geometry(lv_obj_t* obj, JsonObjectConst spec) {
   lv_obj_set_size(obj, spec["w"] | 120, spec["h"] | 60);
 }
 
-// Resolve a desired pixel font size to a compiled Montserrat font.
-// LVGL can't synthesize fonts at runtime — we have to pick from
-// what's compiled in (lv_conf.h: LV_FONT_MONTSERRAT_{14,16,20,28,36,40,
-// 44,48} on the Tough, and the digit fonts up to 140 px for a widget
-// that shows only a number). Snap to the closest compiled size below
-// `desired` so tiles don't overflow when the operator picks a
-// larger-than-fits value; `fallback` is the size used when the
-// spec doesn't specify (preserves existing per-widget defaults).
+// Every font a widget may pick, largest first, with the `display.font_size`
+// that selects it. The first kDigitFonts are number-only fonts. LVGL can't
+// synthesize fonts at runtime, so this is what lv_conf.h compiles in
+// (LV_FONT_MONTSERRAT_{14,16,20,28,36,40,44,48} on the Tough) plus the
+// digit fonts in fonts/. /hello reports the sizes from here, so the
+// designer offers exactly these.
+struct FontStep {
+  int px;
+  const lv_font_t* font;
+};
+const FontStep kLargestFirst[] = {
+    {140, &lv_font_montserrat_digits_140}, {120, &lv_font_montserrat_digits_120},
+    {104, &lv_font_montserrat_digits_104}, {88, &lv_font_montserrat_digits_88},
+    {72, &lv_font_montserrat_digits_72},   {60, &lv_font_montserrat_digits_60},
+    {48, &lv_font_montserrat_48},          {44, &lv_font_montserrat_44},
+    {40, &lv_font_montserrat_40},          {36, &lv_font_montserrat_36},
+    {28, &lv_font_montserrat_28},          {20, &lv_font_montserrat_20},
+    {16, &lv_font_montserrat_16},          {14, &lv_font_montserrat_14}};
+constexpr size_t kDigitFonts = 6;
+
+// Resolve a desired pixel font size to a compiled font: the closest
+// compiled size at or below `desired`, so tiles don't overflow when the
+// operator picks a larger-than-fits value. `digits` admits the
+// number-only fonts; `fallback` is the size used when the spec doesn't
+// specify (preserves existing per-widget defaults).
 const lv_font_t* resolve_font(int desired_px, const lv_font_t* fallback,
                               bool digits) {
   if (desired_px <= 0) return fallback;
-  if (digits) {
-    if (desired_px >= 140) return &lv_font_montserrat_digits_140;
-    if (desired_px >= 120) return &lv_font_montserrat_digits_120;
-    if (desired_px >= 104) return &lv_font_montserrat_digits_104;
-    if (desired_px >= 88) return &lv_font_montserrat_digits_88;
-    if (desired_px >= 72) return &lv_font_montserrat_digits_72;
-    if (desired_px >= 60) return &lv_font_montserrat_digits_60;
+  for (size_t i = digits ? 0 : kDigitFonts; i < std::size(kLargestFirst); ++i) {
+    if (desired_px >= kLargestFirst[i].px) return kLargestFirst[i].font;
   }
-  if (desired_px >= 48) return &lv_font_montserrat_48;
-  if (desired_px >= 44) return &lv_font_montserrat_44;
-  if (desired_px >= 40) return &lv_font_montserrat_40;
-  if (desired_px >= 36) return &lv_font_montserrat_36;
-  if (desired_px >= 28) return &lv_font_montserrat_28;
-  if (desired_px >= 20) return &lv_font_montserrat_20;
-  if (desired_px >= 16) return &lv_font_montserrat_16;
   return &lv_font_montserrat_14;
 }
 
@@ -147,18 +152,6 @@ int32_t text_width(const char* text, const lv_font_t* font) {
   return text_size(text, font).x;
 }
 
-// Every font a widget may pick, largest first; the first six are the
-// number-only fonts.
-const lv_font_t* const kLargestFirst[] = {
-    &lv_font_montserrat_digits_140, &lv_font_montserrat_digits_120,
-    &lv_font_montserrat_digits_104, &lv_font_montserrat_digits_88,
-    &lv_font_montserrat_digits_72,  &lv_font_montserrat_digits_60,
-    &lv_font_montserrat_48,         &lv_font_montserrat_44,
-    &lv_font_montserrat_40,         &lv_font_montserrat_36,
-    &lv_font_montserrat_28,         &lv_font_montserrat_20,
-    &lv_font_montserrat_16,         &lv_font_montserrat_14};
-constexpr size_t kDigitFonts = 6;
-
 // The font a widget uses when the layout sets no `display.font_size`:
 // the largest compiled font in which `sample` fits `max_w` x `max_h`,
 // but never smaller than `floor`, the size the widget had before it
@@ -167,7 +160,7 @@ constexpr size_t kDigitFonts = 6;
 const lv_font_t* fit_font(const char* sample, int32_t max_w, int32_t max_h,
                           const lv_font_t* floor, bool digits = false) {
   for (size_t i = digits ? 0 : kDigitFonts; i < std::size(kLargestFirst); ++i) {
-    const lv_font_t* f = kLargestFirst[i];
+    const lv_font_t* f = kLargestFirst[i].font;
     if (f == floor) return floor;
     const lv_point_t size = text_size(sample, f);
     if (size.x <= max_w && size.y <= max_h) {
@@ -184,7 +177,8 @@ void fit_text(lv_obj_t* label, const lv_font_t* base, int32_t max_w) {
   const char* text = lv_label_get_text(label);
   const lv_font_t* font = &lv_font_montserrat_14;
   bool below = false;
-  for (const lv_font_t* f : kLargestFirst) {
+  for (const FontStep& step : kLargestFirst) {
+    const lv_font_t* f = step.font;
     below = below || f == base;
     if (below && text_width(text, f) <= max_w) {
       font = f;
@@ -542,6 +536,13 @@ int label_width_for(JsonObjectConst spec) {
 }
 }  // namespace
 }  // namespace (anonymous, outer)
+
+void font_sizes(JsonArray text, JsonArray digits) {
+  // Smallest first, as a picker lists them.
+  for (size_t i = std::size(kLargestFirst); i-- > 0;) {
+    (i < kDigitFonts ? digits : text).add(kLargestFirst[i].px);
+  }
+}
 
 bool parse_hex_color(const char* s, uint32_t* out) {
   if (!s || *s != '#') return false;
