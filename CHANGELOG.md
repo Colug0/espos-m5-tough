@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 (2026-11-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Added
+* feat(jlp): list font sizes in /hello by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/53
+### Fixed
+* fix(jlp): ignore callbacks of ended subscriptions by @Colug0 in https://github.com/Colug0/espos-m5-tough/pull/54
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.6.3...v0.7.0
+
 ## 0.6.3 (2026-11-18)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
