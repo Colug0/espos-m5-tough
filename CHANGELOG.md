@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 (2026-11-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Other
+* fix: bump espOS to v0.30.0 by @github-actions[bot] in https://github.com/Colug0/espos-m5-tough/pull/58
+
+
+**Full Changelog**: https://github.com/Colug0/espos-m5-tough/compare/v0.7.1...v0.7.2
+
 ## 0.7.1 (2026-11-19)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
