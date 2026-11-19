@@ -43,6 +43,12 @@ inline bool is_press_keeper(const lv_obj_t* obj) {
 // which lives outside a widget spec.
 bool parse_hex_color(const char* s, uint32_t* out);
 
+// The `display.font_size` values that select a compiled font of their
+// own, smallest first, for /hello: `text` for every widget that takes
+// font_size, `digits` only for one whose text is a number (value, the
+// anchor centre). Any other size snaps down to the next one listed.
+void font_sizes(JsonArray text, JsonArray digits);
+
 // The theme colors currently in effect, for save/restore around a layout
 // build that may fail. apply_theme() has to run BEFORE widgets are built so
 // they pick up the new colors, but a build that fails leaves the previous
